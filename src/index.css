@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@theme {
+  --color-magma: #F39200;
+  --color-magma-dark: #D97F00;
+  --color-charcoal: #404040;
+  --color-charcoal-light: #666666;
+  --font-family-display: 'Jost', sans-serif;
+}
+
+body {
+  font-family: 'Jost', system-ui, sans-serif;
+  background-color: #f8f8f8;
+  color: #333;
+}
+
+/* Toggle button styles */
+.toggle-btn {
+  @apply px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-600 transition-all;
+}
+.toggle-btn:hover {
+  @apply bg-gray-50;
+}
+.toggle-btn.active {
+  @apply bg-magma text-white border-magma;
+}
+
+/* Layer toggle switch */
+.layer-toggle {
+  @apply relative w-12 h-7 rounded-full bg-gray-200 transition-colors cursor-pointer;
+}
+.layer-toggle::after {
+  content: '';
+  @apply absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow transition-transform;
+}
+.layer-toggle.on {
+  @apply bg-magma;
+}
+.layer-toggle.on::after {
+  transform: translateX(20px);
+}
+
+/* Coat selector */
+.coat-btn {
+  @apply w-9 h-9 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-600 transition-all;
+}
+.coat-btn:hover {
+  @apply bg-gray-50;
+}
+.coat-btn.active {
+  @apply bg-charcoal text-white border-charcoal;
+}
+
+/* Choice buttons */
+.choice-btn {
+  @apply flex-1 px-3 py-2 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-600 transition-all text-center;
+}
+.choice-btn:hover {
+  @apply bg-gray-50;
+}
+.choice-btn.active {
+  @apply bg-charcoal text-white border-charcoal;
+}
+
+/* Results panel */
+.results-card {
+  @apply bg-white rounded-xl shadow-sm border border-gray-100 p-5;
+}
+
+/* Layer cards */
+.layer-card {
+  @apply bg-white rounded-xl p-4 border border-gray-100 shadow-sm;
+}
