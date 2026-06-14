@@ -1,99 +1,335 @@
-import { useState } from 'react'
-import { useProducts, useColours } from '@/hooks/useProducts'
-import { calculateFloor, calculateWall, getDefaultCalculatorState, getProductByCode } from '@/lib/calculations'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useColours } from '@/hooks/useProducts'
 import { formatCurrency } from '@/lib/formatters'
-import type { CalculatorState, LineItem, Product } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Copy, Check } from 'lucide-react'
 
+// Types
+interface System {
+  id: string
+  name: string
+  description: string | null
+  surface_type: 'floor' | 'wall' | 'both'
+}
+
+interface SystemProduct {
+  id: string
+  product_id: string
+  stage_id: string
+  option_group: string | null
+  is_default_option: boolean
+  is_optional: boolean
+  coverage_sqm: number
+  coverage_kg_per_sqm: number
+  default_coats: number
+  min_coats: number
+  max_coats: number
+  has_pigment: boolean
+  pigment_default_on: boolean
+  coverage_note: string | null
+  display_order: number
+  product: {
+    id: string
+    name: string
+    pack_size: number
+    pack_unit: string
+    price: number
+  }
+  stage: {
+    id: string
+    name: string
+    display_order: number
+  }
+}
+
+interface LayerState {
+  enabled: boolean
+  selectedProductId: string | null
+  coats: number
+  pigment: boolean
+}
+
 export function Calculator() {
-  const { products, loading: productsLoading } = useProducts()
   const { coloursByFamily, loading: coloursLoading } = useColours()
-  const [state, setState] = useState<CalculatorState>(getDefaultCalculatorState())
+  const [systems, setSystems] = useState<System[]>([])
+  const [systemProducts, setSystemProducts] = useState<SystemProduct[]>([])
+  const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
 
-  if (productsLoading || coloursLoading) {
-    return (
-      <div className="flex items-center justify-center p-12">
-        <div className="w-8 h-8 border-4 border-magma border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
+  // Main state
+  const [surface, setSurface] = useState<'floor' | 'wall' | 'both'>('floor')
+  const [floorArea, setFloorArea] = useState(20)
+  const [wallArea, setWallArea] = useState(10)
+  const [wastagePercent, setWastagePercent] = useState(10)
+  const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null)
+  const [sealerType, setSealerType] = useState<'matt' | 'satin'>('matt')
+  const [selectedColour, setSelectedColour] = useState({ name: 'Natural', hex: '#E8E4DC' })
+
+  // Layer states - keyed by stage name or option_group
+  const [layerStates, setLayerStates] = useState<{ [key: string]: LayerState }>({})
+
+  // Load systems on mount
+  useEffect(() => {
+    async function loadSystems() {
+      const { data } = await supabase
+        .from('systems')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order')
+      
+      if (data && data.length > 0) {
+        setSystems(data)
+        // Auto-select first floor system
+        const floorSystem = data.find(s => s.surface_type === 'floor' || s.name.toLowerCase().includes('floor'))
+        if (floorSystem) {
+          handleSystemChange(floorSystem.id)
+        }
+      }
+      setLoading(false)
+    }
+    loadSystems()
+  }, [])
+
+  // Auto-select appropriate system when surface type changes
+  useEffect(() => {
+    if (systems.length === 0) return
+    
+    let targetSystem: System | undefined
+    
+    if (surface === 'floor') {
+      targetSystem = systems.find(s => s.surface_type === 'floor') 
+        || systems.find(s => s.name.toLowerCase().includes('floor'))
+    } else if (surface === 'wall') {
+      targetSystem = systems.find(s => s.surface_type === 'wall')
+        || systems.find(s => s.name.toLowerCase().includes('wall'))
+    } else {
+      // For 'both', default to floor system
+      targetSystem = systems.find(s => s.surface_type === 'floor')
+        || systems.find(s => s.name.toLowerCase().includes('floor'))
+    }
+    
+    if (targetSystem && targetSystem.id !== selectedSystemId) {
+      handleSystemChange(targetSystem.id)
+    }
+  }, [surface, systems])
+
+  // Auto-refresh when window regains focus (picks up admin changes)
+  useEffect(() => {
+    function onFocus() {
+      if (selectedSystemId) {
+        handleSystemChange(selectedSystemId)
+      }
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [selectedSystemId])
+
+  // Load system products when system changes
+  async function handleSystemChange(systemId: string) {
+    setSelectedSystemId(systemId)
+    
+    const { data } = await supabase
+      .from('system_products')
+      .select('*, product:products(*), stage:stages(*)')
+      .eq('system_id', systemId)
+      .order('display_order')
+
+    if (data) {
+      setSystemProducts(data)
+      
+      // Initialize layer states from defaults
+      const newLayerStates: { [key: string]: LayerState } = {}
+      
+      data.forEach(sp => {
+        const key = sp.option_group || `standalone_${sp.product_id}`
+        const isStandalone = !sp.option_group
+        
+        if (!newLayerStates[key]) {
+          newLayerStates[key] = {
+            // Optional layers start disabled UNLESS is_default_option is true
+            enabled: !sp.is_optional || sp.is_default_option,
+            // For standalone products, always select them. For groups, select the default.
+            selectedProductId: isStandalone ? sp.product_id : (sp.is_default_option ? sp.product_id : null),
+            coats: sp.default_coats || sp.min_coats || 1,
+            // Use pigment_default_on if available, otherwise fall back to has_pigment
+            pigment: sp.has_pigment ? (sp.pigment_default_on !== false) : false,
+          }
+        } else if (sp.is_default_option) {
+          newLayerStates[key].selectedProductId = sp.product_id
+          // Update coats to the default product's default_coats
+          newLayerStates[key].coats = sp.default_coats || sp.min_coats || 1
+          // Update pigment default from the selected default product
+          newLayerStates[key].pigment = sp.has_pigment ? (sp.pigment_default_on !== false) : false
+          // If this is the default option for an optional layer, enable it
+          if (sp.is_optional) {
+            newLayerStates[key].enabled = true
+          }
+        }
+      })
+      
+      setLayerStates(newLayerStates)
+    }
   }
 
-  // Calculate results
-  const floorResult = (state.surface === 'floor' || state.surface === 'both')
-    ? calculateFloor(state, products)
-    : null
-  
-  const wallResult = (state.surface === 'wall' || state.surface === 'both')
-    ? calculateWall(state, products)
-    : null
-
-  // Combine results
-  let allItems: LineItem[] = []
-  let totalPigmentPacks = 0
-  let totalSealKg = 0
-
-  if (floorResult) {
-    allItems = [...allItems, ...floorResult.items]
-    totalPigmentPacks += floorResult.pigmentPacks
-    totalSealKg += floorResult.sealKg
+  function updateLayer(key: string, updates: Partial<LayerState>) {
+    setLayerStates(prev => ({
+      ...prev,
+      [key]: { ...prev[key], ...updates }
+    }))
   }
 
-  if (wallResult) {
-    allItems = [...allItems, ...wallResult.items]
-    totalPigmentPacks += wallResult.pigmentPacks
-    totalSealKg += wallResult.sealKg
+  function toggleLayer(key: string) {
+    setLayerStates(prev => ({
+      ...prev,
+      [key]: { ...prev[key], enabled: !prev[key]?.enabled }
+    }))
   }
 
-  // Add pigment
-  const pigmentProduct = getProductByCode(products, 'pigment')
-  if (totalPigmentPacks > 0 && pigmentProduct) {
-    allItems.push({
-      name: `Pigment - ${state.selectedColour.name}`,
-      qty: `${totalPigmentPacks} pots`,
-      units: totalPigmentPacks,
-      unitSize: 'pot',
-      cost: totalPigmentPacks * pigmentProduct.price,
+  function selectProduct(key: string, productId: string) {
+    // Find the system product to get its pigment_default_on value
+    const sp = systemProducts.find(p => p.product_id === productId)
+    const pigmentDefault = sp?.has_pigment ? (sp.pigment_default_on !== false) : false
+    
+    setLayerStates(prev => ({
+      ...prev,
+      [key]: { 
+        ...prev[key], 
+        selectedProductId: productId,
+        pigment: pigmentDefault,
+        // Also update coats to the new product's defaults
+        coats: sp?.default_coats || sp?.min_coats || prev[key]?.coats || 1
+      }
+    }))
+  }
+
+  function setCoats(key: string, coats: number) {
+    setLayerStates(prev => ({
+      ...prev,
+      [key]: { ...prev[key], coats }
+    }))
+  }
+
+  function togglePigment(key: string) {
+    setLayerStates(prev => ({
+      ...prev,
+      [key]: { ...prev[key], pigment: !prev[key]?.pigment }
+    }))
+  }
+
+  // Group products by stage
+  function getLayersByStage() {
+    const stages: { [stageName: string]: { stageOrder: number; layers: { key: string; products: SystemProduct[]; isOptional: boolean }[] } } = {}
+    
+    systemProducts.forEach(sp => {
+      const stageName = sp.stage?.name || 'Other'
+      const stageOrder = sp.stage?.display_order || 99
+      
+      if (!stages[stageName]) {
+        stages[stageName] = { stageOrder, layers: [] }
+      }
+      
+      const key = sp.option_group || `standalone_${sp.product_id}`
+      let layer = stages[stageName].layers.find(l => l.key === key)
+      
+      if (!layer) {
+        layer = { key, products: [], isOptional: sp.is_optional }
+        stages[stageName].layers.push(layer)
+      }
+      
+      layer.products.push(sp)
     })
+    
+    // Sort stages by display_order
+    return Object.entries(stages)
+      .sort(([, a], [, b]) => a.stageOrder - b.stageOrder)
   }
 
-  // Add sealer
-  const sealProduct = getProductByCode(products, state.sealerType === 'matt' ? 'pu_seal_matt' : 'pu_seal_satin')
-  if (totalSealKg > 0 && sealProduct) {
-    const sealUnits = Math.ceil(totalSealKg / sealProduct.pack_size)
-    allItems.push({
-      name: sealProduct.name,
-      qty: `${totalSealKg.toFixed(1)}kg (2 coats)`,
-      units: sealUnits,
-      unitSize: `${sealProduct.pack_size}kg`,
-      cost: sealUnits * sealProduct.price,
+  // Calculate materials
+  function calculate() {
+    const items: { name: string; qty: string; units: number; unitSize: string; cost: number }[] = []
+    const area = (surface === 'floor' ? floorArea : surface === 'wall' ? wallArea : floorArea + wallArea) * (1 + wastagePercent / 100)
+    let totalPigmentedKg = 0
+
+    Object.entries(layerStates).forEach(([key, state]) => {
+      if (!state.enabled) return
+      if (!state.selectedProductId) return
+
+      const sp = systemProducts.find(p => p.product_id === state.selectedProductId)
+      if (!sp || !sp.product) return
+
+      const coats = state.coats || 1
+      const coverage = sp.coverage_sqm || sp.product.pack_size
+      const areaWithCoats = area * coats
+      const unitsNeeded = Math.ceil(areaWithCoats / coverage)
+
+      items.push({
+        name: sp.product.name,
+        qty: coats > 1 ? `${area.toFixed(1)}m² × ${coats} coats` : `${area.toFixed(1)}m²`,
+        units: unitsNeeded,
+        unitSize: `${sp.product.pack_size}${sp.product.pack_unit}`,
+        cost: unitsNeeded * sp.product.price,
+      })
+
+      if (state.pigment && sp.has_pigment) {
+        totalPigmentedKg += unitsNeeded * sp.product.pack_size
+      }
     })
+
+    // Add pigment pots (1 per 20kg)
+    if (totalPigmentedKg > 0) {
+      const pigmentPots = Math.ceil(totalPigmentedKg / 20)
+      const pigmentProduct = systemProducts.find(sp => sp.product?.name?.includes('Pigment'))?.product
+      if (pigmentProduct) {
+        items.push({
+          name: `Pigment - ${selectedColour.name}`,
+          qty: `${pigmentPots} pot${pigmentPots > 1 ? 's' : ''}`,
+          units: pigmentPots,
+          unitSize: 'pot',
+          cost: pigmentPots * pigmentProduct.price,
+        })
+      }
+    }
+
+    // Add sealer
+    const sealerProduct = systemProducts.find(sp => 
+      sp.product?.name?.toLowerCase().includes('seal') && 
+      sp.product?.name?.toLowerCase().includes(sealerType)
+    )?.product
+    
+    if (sealerProduct) {
+      const sealerCoverage = 30 // 5kg covers 30m² for 2 coats
+      const sealerUnits = Math.ceil(area / sealerCoverage)
+      items.push({
+        name: sealerProduct.name,
+        qty: `${area.toFixed(1)}m² (2 coats)`,
+        units: sealerUnits,
+        unitSize: `${sealerProduct.pack_size}${sealerProduct.pack_unit}`,
+        cost: sealerUnits * sealerProduct.price,
+      })
+    }
+
+    const subtotal = items.reduce((sum, item) => sum + item.cost, 0)
+    return { items, subtotal }
   }
 
-  // Calculate totals
-  const subtotal = allItems.reduce((sum, item) => sum + item.cost, 0)
+  const { items, subtotal } = calculate()
   const vat = subtotal * 0.2
   const total = subtotal + vat
+  const totalArea = surface === 'floor' ? floorArea : surface === 'wall' ? wallArea : floorArea + wallArea
+  const costPerM2 = totalArea > 0 ? subtotal / totalArea : 0
 
-  const totalArea = state.surface === 'floor' ? state.floorArea
-    : state.surface === 'wall' ? state.wallArea
-    : state.floorArea + state.wallArea
+  const selectedSystem = systems.find(s => s.id === selectedSystemId)
+  const stageGroups = getLayersByStage()
 
-  const costPerM2 = subtotal / totalArea
-
-  // Update a single state property
-  const update = <K extends keyof CalculatorState>(key: K, value: CalculatorState[K]) => {
-    setState(prev => ({ ...prev, [key]: value }))
-  }
-
-  // Copy shopping list
-  const copyList = () => {
-    let text = 'MAGMA CALCULATOR - Shopping List\n'
+  // Copy list
+  function copyList() {
+    let text = `MAGMA CALCULATOR - ${selectedSystem?.name || 'Quote'}\n`
+    text += `${totalArea}m² - ${selectedColour.name}\n`
     text += '================================\n\n'
     
-    allItems.forEach(item => {
+    items.forEach(item => {
       text += `${item.units}× ${item.name} (${item.unitSize}) - £${formatCurrency(item.cost)}\n`
     })
 
@@ -101,673 +337,387 @@ export function Calculator() {
     text += `\nVAT: £${formatCurrency(vat)}`
     text += `\nTOTAL: £${formatCurrency(total)}`
     text += `\n\nCost per m² (ex VAT): £${formatCurrency(costPerM2)}`
-    text += `\n\n* Includes ${state.wastagePercent}% wastage allowance`
+    text += `\n\n* Includes ${wastagePercent}% wastage`
 
     navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 py-6 grid lg:grid-cols-[1fr,380px] gap-6">
-      {/* Configuration Panel */}
-      <div className="space-y-4">
-        {/* Surface selector */}
-        <Card className="p-4">
-          <h2 className="text-sm font-medium text-gray-500 mb-3">Surface type</h2>
-          <div className="flex flex-wrap gap-2">
-            {(['floor', 'wall', 'both'] as const).map(surface => (
-              <button
-                key={surface}
-                className={`toggle-btn ${state.surface === surface ? 'active' : ''}`}
-                onClick={() => update('surface', surface)}
-              >
-                {surface === 'floor' ? 'Floor Only' : surface === 'wall' ? 'Wall Only' : 'Floor + Wall'}
-              </button>
-            ))}
-          </div>
-        </Card>
+  if (loading || coloursLoading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="w-8 h-8 border-4 border-magma border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
 
-        {/* Area inputs */}
-        <Card className="p-4">
-          <h2 className="text-sm font-medium text-gray-500 mb-3">Area</h2>
-          <div className="flex flex-wrap gap-4">
-            {(state.surface === 'floor' || state.surface === 'both') && (
+  // Filter systems by surface type
+  const availableSystems = systems.filter(s => {
+    if (surface === 'floor') return s.surface_type === 'floor' || s.name.toLowerCase().includes('floor')
+    if (surface === 'wall') return s.surface_type === 'wall' || s.name.toLowerCase().includes('wall')
+    return true
+  })
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="text-center mb-8">
+        <h1 className="text-2xl font-semibold text-gray-900">Magma Calculator</h1>
+        <p className="text-gray-500 text-sm mt-1">Material estimator for microcement systems</p>
+      </div>
+
+      <div className="grid lg:grid-cols-[1fr,340px] gap-6">
+        {/* Configuration */}
+        <div className="space-y-4">
+          {/* Surface type */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <p className="text-sm text-gray-500 mb-3">Surface type</p>
+            <div className="flex gap-2">
+              {(['floor', 'wall', 'both'] as const).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setSurface(s)}
+                  className={`flex-1 py-3 px-4 rounded-lg font-medium text-sm transition-all ${
+                    surface === s
+                      ? 'bg-blue-50 border-blue-500 text-blue-700 border'
+                      : 'bg-white border border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {s === 'floor' ? 'Floor' : s === 'wall' ? 'Wall' : 'Floor + Wall'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Area */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <p className="text-sm text-gray-500 mb-3">Area</p>
+            <div className="flex flex-wrap items-center gap-4">
+              {(surface === 'floor' || surface === 'both') && (
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-600 font-medium">Floor:</label>
+                  <input
+                    type="number"
+                    value={floorArea}
+                    onChange={e => setFloorArea(parseFloat(e.target.value) || 1)}
+                    className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-center font-semibold"
+                  />
+                  <span className="text-sm text-gray-500">m²</span>
+                </div>
+              )}
+              {(surface === 'wall' || surface === 'both') && (
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-600 font-medium">Wall:</label>
+                  <input
+                    type="number"
+                    value={wallArea}
+                    onChange={e => setWallArea(parseFloat(e.target.value) || 1)}
+                    className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-center font-semibold"
+                  />
+                  <span className="text-sm text-gray-500">m²</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-600">Floor:</label>
+                <label className="text-sm text-gray-500">Wastage:</label>
                 <input
                   type="number"
-                  value={state.floorArea}
-                  onChange={e => update('floorArea', parseFloat(e.target.value) || 1)}
-                  min={1}
-                  max={500}
-                  className="w-20 h-9 px-3 rounded-lg border border-gray-200 text-sm"
+                  value={wastagePercent}
+                  onChange={e => setWastagePercent(parseFloat(e.target.value) || 0)}
+                  className="w-16 px-2 py-2 border border-gray-200 rounded-lg text-center"
                 />
-                <span className="text-sm text-gray-500">m²</span>
+                <span className="text-sm text-gray-500">%</span>
               </div>
-            )}
-            {(state.surface === 'wall' || state.surface === 'both') && (
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-600">Wall:</label>
-                <input
-                  type="number"
-                  value={state.wallArea}
-                  onChange={e => update('wallArea', parseFloat(e.target.value) || 1)}
-                  min={1}
-                  max={500}
-                  className="w-20 h-9 px-3 rounded-lg border border-gray-200 text-sm"
-                />
-                <span className="text-sm text-gray-500">m²</span>
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600">Wastage:</label>
-              <input
-                type="number"
-                value={state.wastagePercent}
-                onChange={e => update('wastagePercent', parseFloat(e.target.value) || 0)}
-                min={0}
-                max={50}
-                className="w-16 h-9 px-3 rounded-lg border border-gray-200 text-sm"
-              />
-              <span className="text-sm text-gray-500">%</span>
-            </div>
-          </div>
-        </Card>
-
-        {/* Floor configuration */}
-        {(state.surface === 'floor' || state.surface === 'both') && (
-          <FloorConfig state={state} update={update} />
-        )}
-
-        {/* Wall configuration */}
-        {(state.surface === 'wall' || state.surface === 'both') && (
-          <WallConfig state={state} update={update} />
-        )}
-
-        {/* Colour picker */}
-        <Card className="p-4">
-          <h2 className="text-sm font-medium text-gray-500 mb-3">Pigment colour</h2>
-          <div className="space-y-3">
-            {coloursByFamily.map(({ family, shades }) => (
-              <div key={family.id}>
-                <p className="text-xs text-gray-400 mb-2">{family.name}</p>
-                <div className="flex flex-wrap gap-2">
-                  {shades.map(swatch => (
-                    <button
-                      key={swatch.id}
-                      className={`w-8 h-8 rounded-lg border-2 transition-all ${
-                        state.selectedColour.name === swatch.name
-                          ? 'border-charcoal scale-110'
-                          : 'border-transparent hover:border-gray-300'
-                      }`}
-                      style={{ backgroundColor: swatch.hex_code }}
-                      onClick={() => update('selectedColour', {
-                        id: swatch.id,
-                        name: swatch.name,
-                        hex: swatch.hex_code,
-                      })}
-                      title={swatch.name}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="text-sm text-gray-600 mt-3">
-            Selected: <strong>{state.selectedColour.name}</strong>
-          </p>
-        </Card>
-
-        {/* Sealer type */}
-        <Card className="p-4">
-          <h2 className="text-sm font-medium text-gray-500 mb-3">Sealer finish</h2>
-          <div className="flex gap-2">
-            <button
-              className={`toggle-btn ${state.sealerType === 'matt' ? 'active' : ''}`}
-              onClick={() => update('sealerType', 'matt')}
-            >
-              Matt
-            </button>
-            <button
-              className={`toggle-btn ${state.sealerType === 'satin' ? 'active' : ''}`}
-              onClick={() => update('sealerType', 'satin')}
-            >
-              Satin
-            </button>
-          </div>
-        </Card>
-      </div>
-
-      {/* Results Panel */}
-      <div className="lg:sticky lg:top-20 lg:self-start">
-        <Card className="p-5">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Materials - {totalArea}m² {state.surface === 'both' ? 'floor + wall' : state.surface}
-          </h2>
-
-          <div className="space-y-2 mb-4">
-            {allItems.map((item, i) => (
-              <div key={i} className="flex justify-between text-sm py-2 border-b border-gray-100">
-                <div>
-                  <p className="font-medium text-gray-900">{item.name}</p>
-                  <p className="text-gray-500 text-xs">{item.qty} → {item.units}× {item.unitSize}</p>
-                </div>
-                <p className="font-medium text-gray-900">£{formatCurrency(item.cost)}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="space-y-2 pt-4 border-t border-gray-200">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Subtotal (ex VAT)</span>
-              <span className="font-medium">£{formatCurrency(subtotal)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">VAT (20%)</span>
-              <span className="font-medium">£{formatCurrency(vat)}</span>
-            </div>
-            {state.includeDelivery && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Pallet delivery</span>
-                <span className="text-gray-500">TBC</span>
-              </div>
-            )}
-            <div className="flex justify-between text-base font-semibold pt-2 border-t border-gray-200">
-              <span>Total (inc VAT)</span>
-              <span className="text-magma">£{formatCurrency(total)}</span>
-            </div>
-            <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-              <span className="text-gray-600">Cost per m² (ex VAT)</span>
-              <span className="font-semibold">£{formatCurrency(costPerM2)}</span>
             </div>
           </div>
 
-          <div className="mt-6 space-y-2">
-            <Button className="w-full gap-2" onClick={copyList}>
-              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              {copied ? 'Copied!' : 'Copy shopping list'}
-            </Button>
+          {/* Build type / System */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <p className="text-sm text-gray-500 mb-3">Build type</p>
+            <div className="flex gap-2">
+              {availableSystems.map(system => (
+                <button
+                  key={system.id}
+                  onClick={() => handleSystemChange(system.id)}
+                  className={`flex-1 py-3 px-4 rounded-lg font-medium text-sm transition-all ${
+                    selectedSystemId === system.id
+                      ? 'bg-blue-50 border-blue-500 text-blue-700 border'
+                      : 'bg-white border border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {system.name.replace('Floor ', '').replace('Wall ', '')}
+                </button>
+              ))}
+            </div>
           </div>
-        </Card>
-      </div>
-    </div>
-  )
-}
 
-// Floor configuration component
-function FloorConfig({ state, update }: {
-  state: CalculatorState
-  update: <K extends keyof CalculatorState>(key: K, value: CalculatorState[K]) => void
-}) {
-  return (
-    <Card className="p-4 space-y-4">
-      <h2 className="text-sm font-medium text-gray-500">Floor configuration</h2>
+          {/* Layer cards */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <p className="text-sm text-gray-500 mb-4">Layers</p>
+            <div className="space-y-3">
+              {stageGroups.map(([stageName, { layers }]) => (
+                layers.map(layer => {
+                  const state = layerStates[layer.key] || { enabled: false, selectedProductId: null, coats: 1, pigment: false }
+                  const hasMultipleProducts = layer.products.length > 1
+                  // For standalone products, always use the first product even if selectedProductId doesn't match
+                  const selectedProduct = hasMultipleProducts 
+                    ? layer.products.find(p => p.product_id === state.selectedProductId)
+                    : layer.products[0]
+                  // Only show coat buttons if there's a choice (min < max)
+                  const hasCoatOptions = selectedProduct && 
+                    (selectedProduct.min_coats || 1) < (selectedProduct.max_coats || 1)
+                  const hasPigmentOption = selectedProduct?.has_pigment
+                  // Show full card if enabled, or if it has special options (pigment/coats)
+                  const showFullCard = state.enabled || !layer.isOptional || hasCoatOptions || hasPigmentOption
+                  // Fixed coats (when min = max and > 1)
+                  const fixedCoats = selectedProduct && 
+                    (selectedProduct.min_coats || 1) === (selectedProduct.max_coats || 1) && 
+                    (selectedProduct.min_coats || 1) > 1 
+                      ? selectedProduct.min_coats 
+                      : null
 
-      {/* Build type */}
-      <div>
-        <p className="text-xs text-gray-400 mb-2">Build type</p>
-        <div className="flex gap-2">
-          <button
-            className={`toggle-btn ${state.floorBuildType === 'bb' ? 'active' : ''}`}
-            onClick={() => update('floorBuildType', 'bb')}
-          >
-            Belt & Braces
-          </button>
-          <button
-            className={`toggle-btn ${state.floorBuildType === 'std' ? 'active' : ''}`}
-            onClick={() => update('floorBuildType', 'std')}
-          >
-            Standard
-          </button>
-        </div>
-      </div>
+                  return (
+                    <div key={layer.key} className={`bg-gray-50 border border-gray-100 rounded-lg p-4 ${
+                      layer.isOptional && !state.enabled ? 'opacity-60' : ''
+                    }`}>
+                      {/* Layer header */}
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {hasMultipleProducts 
+                              ? stageName 
+                              : selectedProduct?.product?.name || layer.products[0]?.product?.name || stageName}
+                          </p>
+                          {selectedProduct?.coverage_note && (
+                            <p className="text-xs text-gray-500 mt-0.5">{selectedProduct.coverage_note}</p>
+                          )}
+                        </div>
+                        {layer.isOptional && (
+                          <button
+                            onClick={() => toggleLayer(layer.key)}
+                            className={`w-12 h-6 rounded-full transition-colors relative ${
+                              state.enabled ? 'bg-green-500' : 'bg-gray-300'
+                            }`}
+                          >
+                            <div className={`w-5 h-5 rounded-full bg-white shadow absolute top-0.5 transition-transform ${
+                              state.enabled ? 'translate-x-6' : 'translate-x-0.5'
+                            }`} />
+                          </button>
+                        )}
+                      </div>
 
-      {/* Finish */}
-      <div>
-        <p className="text-xs text-gray-400 mb-2">Finish coat</p>
-        <div className="flex gap-2">
-          <button
-            className={`toggle-btn ${state.floorFinish === '500' ? 'active' : ''}`}
-            onClick={() => update('floorFinish', '500')}
-          >
-            500 Medium
-          </button>
-          <button
-            className={`toggle-btn ${state.floorFinish === '700' ? 'active' : ''}`}
-            onClick={() => update('floorFinish', '700')}
-          >
-            700 Smooth
-          </button>
-        </div>
-      </div>
+                      {/* Product choices */}
+                      {showFullCard && hasMultipleProducts && (
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {layer.products.map(sp => (
+                            <button
+                              key={sp.product_id}
+                              onClick={() => selectProduct(layer.key, sp.product_id)}
+                              disabled={layer.isOptional && !state.enabled}
+                              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                state.selectedProductId === sp.product_id
+                                  ? 'bg-blue-50 border-blue-500 text-blue-700 border'
+                                  : 'bg-white border border-gray-200 hover:border-gray-300'
+                              } ${layer.isOptional && !state.enabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                              {sp.product?.name
+                                ?.replace('DPM Epoxy Primer ', '')
+                                .replace('Fibreglass ', '')
+                                .replace('PU Seal ', '')
+                                .replace('Magma ', '')}
+                            </button>
+                          ))}
+                        </div>
+                      )}
 
-      {/* DPM Type */}
-      <div className="layer-card">
-        <p className="text-sm font-medium mb-2">DPM Epoxy Primer</p>
-        <div className="flex gap-2">
-          <button
-            className={`choice-btn ${state.dpmType === 'std' ? 'active' : ''}`}
-            onClick={() => update('dpmType', 'std')}
-          >
-            Standard Cure
-          </button>
-          <button
-            className={`choice-btn ${state.dpmType === 'fast' ? 'active' : ''}`}
-            onClick={() => update('dpmType', 'fast')}
-          >
-            Fast Cure
-          </button>
-        </div>
-      </div>
-
-      {/* B&B Mesh */}
-      {state.floorBuildType === 'bb' && (
-        <div className="layer-card">
-          <div className="flex justify-between items-center mb-2">
-            <p className="text-sm font-medium">Fibreglass Mesh</p>
-            <button
-              className={`layer-toggle ${state.includeMesh ? 'on' : ''}`}
-              onClick={() => update('includeMesh', !state.includeMesh)}
-            />
+                      {/* Coats and pigment */}
+                      {showFullCard && (hasCoatOptions || hasPigmentOption || fixedCoats) && (
+                        <div className={`flex flex-wrap items-center gap-4 mt-3 pt-3 border-t border-gray-200 ${
+                          layer.isOptional && !state.enabled ? 'opacity-50' : ''
+                        }`}>
+                          {hasCoatOptions && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500 font-medium">Coats:</span>
+                              {Array.from({ length: (selectedProduct?.max_coats || 2) - (selectedProduct?.min_coats || 1) + 1 }, (_, i) => (selectedProduct?.min_coats || 1) + i).map(n => (
+                                <button
+                                  key={n}
+                                  onClick={() => setCoats(layer.key, n)}
+                                  disabled={layer.isOptional && !state.enabled}
+                                  className={`w-8 h-8 rounded-lg text-sm font-semibold transition-all ${
+                                    state.coats === n
+                                      ? 'bg-blue-50 border-blue-500 text-blue-700 border'
+                                      : 'bg-white border border-gray-200'
+                                  } ${layer.isOptional && !state.enabled ? 'cursor-not-allowed' : ''}`}
+                                >
+                                  {n}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {fixedCoats && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500 font-medium">Coats:</span>
+                              <span className="px-3 py-1.5 bg-gray-100 rounded-lg text-sm font-semibold text-gray-700">
+                                {fixedCoats}
+                              </span>
+                            </div>
+                          )}
+                          {hasPigmentOption && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500">Add pigment:</span>
+                              <button
+                                onClick={() => !layer.isOptional || state.enabled ? togglePigment(layer.key) : null}
+                                className={`w-10 h-5 rounded-full transition-colors relative ${
+                                  state.pigment ? 'bg-green-500' : 'bg-gray-300'
+                                } ${layer.isOptional && !state.enabled ? 'cursor-not-allowed' : ''}`}
+                              >
+                                <div className={`w-4 h-4 rounded-full bg-white shadow absolute top-0.5 transition-transform ${
+                                  state.pigment ? 'translate-x-5' : 'translate-x-0.5'
+                                }`} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              ))}
+            </div>
           </div>
-          {state.includeMesh && (
+
+          {/* Sealer */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <p className="text-sm text-gray-500 mb-3">Sealer</p>
             <div className="flex gap-2">
               <button
-                className={`choice-btn ${state.meshType === '62' ? 'active' : ''}`}
-                onClick={() => update('meshType', '62')}
+                onClick={() => setSealerType('matt')}
+                className={`flex-1 py-3 px-4 rounded-lg font-medium text-sm transition-all ${
+                  sealerType === 'matt'
+                    ? 'bg-blue-50 border-blue-500 text-blue-700 border'
+                    : 'bg-white border border-gray-200 hover:border-gray-300'
+                }`}
               >
-                Mesh 62
+                Matt
               </button>
               <button
-                className={`choice-btn ${state.meshType === '88' ? 'active' : ''}`}
-                onClick={() => update('meshType', '88')}
+                onClick={() => setSealerType('satin')}
+                className={`flex-1 py-3 px-4 rounded-lg font-medium text-sm transition-all ${
+                  sealerType === 'satin'
+                    ? 'bg-blue-50 border-blue-500 text-blue-700 border'
+                    : 'bg-white border border-gray-200 hover:border-gray-300'
+                }`}
               >
-                Mesh 88
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Quartz */}
-      {state.floorBuildType === 'bb' && (
-        <div className="layer-card">
-          <div className="flex justify-between items-center">
-            <p className="text-sm font-medium">Quartz Blinding</p>
-            <button
-              className={`layer-toggle ${state.includeQuartz ? 'on' : ''}`}
-              onClick={() => update('includeQuartz', !state.includeQuartz)}
-            />
-          </div>
-        </div>
-      )}
-
-      {state.floorBuildType === 'std' && (
-        <div className="layer-card">
-          <div className="flex justify-between items-center">
-            <p className="text-sm font-medium">Quartz Blinding (optional)</p>
-            <button
-              className={`layer-toggle ${state.includeQuartzStd ? 'on' : ''}`}
-              onClick={() => update('includeQuartzStd', !state.includeQuartzStd)}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Base coat */}
-      <div className="layer-card">
-        <p className="text-sm font-medium mb-2">Base coat</p>
-        <div className="flex gap-2 mb-3">
-          <button
-            className={`choice-btn ${state.baseChoice === 'bondprime' ? 'active' : ''}`}
-            onClick={() => update('baseChoice', 'bondprime')}
-          >
-            BondPrime SC
-          </button>
-          <button
-            className={`choice-btn ${state.baseChoice === 'magma200' ? 'active' : ''}`}
-            onClick={() => update('baseChoice', 'magma200')}
-          >
-            Magma 200 XL
-          </button>
-        </div>
-
-        {state.baseChoice === 'bondprime' && (
-          <>
-            <div className="flex gap-2 mb-2">
-              <button
-                className={`choice-btn ${state.bondprimeApplication === 'mesh' ? 'active' : ''}`}
-                onClick={() => update('bondprimeApplication', 'mesh')}
-              >
-                Over Mesh (1.5kg/m²)
-              </button>
-              <button
-                className={`choice-btn ${state.bondprimeApplication === 'epoxy' ? 'active' : ''}`}
-                onClick={() => update('bondprimeApplication', 'epoxy')}
-              >
-                Over Epoxy/Quartz (1kg/m²)
+                Satin
               </button>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">Include Quartz</span>
-              <button
-                className={`layer-toggle ${state.bondprimeIncludeQuartz ? 'on' : ''}`}
-                onClick={() => update('bondprimeIncludeQuartz', !state.bondprimeIncludeQuartz)}
-                style={{ width: 40, height: 22 }}
+          </div>
+
+          {/* Colour picker */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <p className="text-sm text-gray-500 mb-3">Pigment colour</p>
+            <div className="space-y-3">
+              {coloursByFamily.map(({ family, shades }) => (
+                <div key={family.id}>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">{family.name}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {shades.map(swatch => (
+                      <button
+                        key={swatch.id}
+                        onClick={() => setSelectedColour({ name: swatch.name, hex: swatch.hex_code })}
+                        className={`w-8 h-8 rounded-lg border-2 transition-all ${
+                          selectedColour.name === swatch.name
+                            ? 'border-gray-900 scale-110 shadow-lg'
+                            : 'border-transparent hover:scale-105'
+                        }`}
+                        style={{ backgroundColor: swatch.hex_code }}
+                        title={swatch.name}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-3 mt-4 p-3 bg-gray-50 rounded-lg">
+              <div 
+                className="w-8 h-8 rounded-lg border border-gray-200"
+                style={{ backgroundColor: selectedColour.hex }}
               />
-            </div>
-          </>
-        )}
-
-        {state.baseChoice === 'magma200' && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">Coats:</span>
-              <button
-                className={`coat-btn ${state.magma200FloorCoats === 1 ? 'active' : ''}`}
-                onClick={() => update('magma200FloorCoats', 1)}
-              >
-                1
-              </button>
-              <button
-                className={`coat-btn ${state.magma200FloorCoats === 2 ? 'active' : ''}`}
-                onClick={() => update('magma200FloorCoats', 2)}
-              >
-                2
-              </button>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">Add pigment</span>
-              <button
-                className={`layer-toggle ${state.magma200FloorPigment ? 'on' : ''}`}
-                onClick={() => update('magma200FloorPigment', !state.magma200FloorPigment)}
-                style={{ width: 40, height: 22 }}
-              />
+              <span className="font-medium">{selectedColour.name}</span>
             </div>
           </div>
-        )}
-      </div>
-
-      {/* Magma 300 */}
-      <div className="layer-card">
-        <div className="flex justify-between items-center mb-2">
-          <p className="text-sm font-medium">Magma 300 Large</p>
-          <button
-            className={`layer-toggle ${state.includeMagma300Floor ? 'on' : ''}`}
-            onClick={() => update('includeMagma300Floor', !state.includeMagma300Floor)}
-          />
         </div>
-        {state.includeMagma300Floor && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">Coats:</span>
-              <button
-                className={`coat-btn ${state.magma300FloorCoats === 1 ? 'active' : ''}`}
-                onClick={() => update('magma300FloorCoats', 1)}
-              >
-                1
-              </button>
-              <button
-                className={`coat-btn ${state.magma300FloorCoats === 2 ? 'active' : ''}`}
-                onClick={() => update('magma300FloorCoats', 2)}
-              >
-                2
-              </button>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">Add pigment</span>
-              <button
-                className={`layer-toggle ${state.magma300FloorPigment ? 'on' : ''}`}
-                onClick={() => update('magma300FloorPigment', !state.magma300FloorPigment)}
-                style={{ width: 40, height: 22 }}
-              />
-            </div>
-          </div>
-        )}
-      </div>
 
-      {/* Finish coat pigment */}
-      <div className="layer-card">
-        <p className="text-sm font-medium mb-2">
-          Magma {state.floorFinish} {state.floorFinish === '500' ? 'Medium' : 'Smooth'}
-        </p>
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Coats:</span>
-            {state.floorFinish === '500' ? (
-              <>
-                <button
-                  className={`coat-btn ${state.floorMagma500Coats === 1 ? 'active' : ''}`}
-                  onClick={() => update('floorMagma500Coats', 1)}
-                >
-                  1
-                </button>
-                <button
-                  className={`coat-btn ${state.floorMagma500Coats === 2 ? 'active' : ''}`}
-                  onClick={() => update('floorMagma500Coats', 2)}
-                >
-                  2
-                </button>
-              </>
+        {/* Results */}
+        <div className="lg:sticky lg:top-6 h-fit">
+          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="font-semibold text-gray-900">Materials</h2>
+              <button
+                onClick={copyList}
+                className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-magma"
+              >
+                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+
+            {items.length === 0 ? (
+              <p className="text-gray-400 text-sm text-center py-8">
+                Configure your layers to see materials
+              </p>
             ) : (
               <>
-                <button
-                  className={`coat-btn ${state.floorMagma700Coats === 1 ? 'active' : ''}`}
-                  onClick={() => update('floorMagma700Coats', 1)}
-                >
-                  1
-                </button>
-                <button
-                  className={`coat-btn ${state.floorMagma700Coats === 2 ? 'active' : ''}`}
-                  onClick={() => update('floorMagma700Coats', 2)}
-                >
-                  2
-                </button>
+                <div className="space-y-1 mb-4">
+                  {items.map((item, idx) => (
+                    <div key={idx} className="flex justify-between py-2 border-b border-gray-100 last:border-0">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                        <p className="text-xs text-gray-500">{item.qty}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium">£{formatCurrency(item.cost)}</p>
+                        <p className="text-xs text-gray-500">{item.units} × {item.unitSize}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t-2 border-gray-200 pt-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Subtotal</span>
+                    <span className="font-medium">£{formatCurrency(subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">VAT (20%)</span>
+                    <span className="font-medium">£{formatCurrency(vat)}</span>
+                  </div>
+                  <div className="flex justify-between text-xl font-bold pt-2">
+                    <span>Total</span>
+                    <span className="text-magma">£{formatCurrency(total)}</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Cost per m²</span>
+                    <span className="font-semibold">£{formatCurrency(costPerM2)}</span>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-400 mt-4">
+                  * Includes {wastagePercent}% wastage
+                </p>
               </>
             )}
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-500">Add pigment</span>
-            <button
-              className={`layer-toggle ${state.floorFinishPigment ? 'on' : ''}`}
-              onClick={() => update('floorFinishPigment', !state.floorFinishPigment)}
-              style={{ width: 40, height: 22 }}
-            />
-          </div>
+
+          <Button className="w-full mt-4" size="lg">
+            Save Quote
+          </Button>
         </div>
       </div>
 
-      {/* Pore filler */}
-      <div className="layer-card">
-        <div className="flex justify-between items-center mb-2">
-          <p className="text-sm font-medium">Pore filler</p>
-          <button
-            className={`layer-toggle ${state.floorPoreFiller ? 'on' : ''}`}
-            onClick={() => update('floorPoreFiller', !state.floorPoreFiller)}
-          />
-        </div>
-        {state.floorPoreFiller && (
-          <div className="flex gap-2">
-            <button
-              className={`choice-btn ${state.floorPoreFillerType === 'xero' ? 'active' : ''}`}
-              onClick={() => update('floorPoreFillerType', 'xero')}
-            >
-              Xero Pore Filler
-            </button>
-            <button
-              className={`choice-btn ${state.floorPoreFillerType === 'epgela' ? 'active' : ''}`}
-              onClick={() => update('floorPoreFillerType', 'epgela')}
-            >
-              EP Gela
-            </button>
-          </div>
-        )}
-      </div>
-    </Card>
-  )
-}
-
-// Wall configuration (simplified - similar pattern to floor)
-function WallConfig({ state, update }: {
-  state: CalculatorState
-  update: <K extends keyof CalculatorState>(key: K, value: CalculatorState[K]) => void
-}) {
-  return (
-    <Card className="p-4 space-y-4">
-      <h2 className="text-sm font-medium text-gray-500">Wall configuration</h2>
-
-      {/* Build type */}
-      <div>
-        <p className="text-xs text-gray-400 mb-2">Build type</p>
-        <div className="flex gap-2">
-          <button
-            className={`toggle-btn ${state.wallBuildType === 'bb' ? 'active' : ''}`}
-            onClick={() => update('wallBuildType', 'bb')}
-          >
-            Belt & Braces
-          </button>
-          <button
-            className={`toggle-btn ${state.wallBuildType === 'std' ? 'active' : ''}`}
-            onClick={() => update('wallBuildType', 'std')}
-          >
-            Standard
-          </button>
-        </div>
-      </div>
-
-      {/* Finish */}
-      <div>
-        <p className="text-xs text-gray-400 mb-2">Finish coat</p>
-        <div className="flex gap-2">
-          <button
-            className={`toggle-btn ${state.wallFinish === '500' ? 'active' : ''}`}
-            onClick={() => update('wallFinish', '500')}
-          >
-            500 Medium
-          </button>
-          <button
-            className={`toggle-btn ${state.wallFinish === '700' ? 'active' : ''}`}
-            onClick={() => update('wallFinish', '700')}
-          >
-            700 Smooth
-          </button>
-        </div>
-      </div>
-
-      {/* Wall primer */}
-      <div className="layer-card">
-        <p className="text-sm font-medium mb-2">Wall Primer</p>
-        <div className="flex gap-2">
-          <button
-            className={`choice-btn ${state.wallPrimer === '180' ? 'active' : ''}`}
-            onClick={() => update('wallPrimer', '180')}
-          >
-            Primer 180
-          </button>
-          <button
-            className={`choice-btn ${state.wallPrimer === '200' ? 'active' : ''}`}
-            onClick={() => update('wallPrimer', '200')}
-          >
-            Primer 200
-          </button>
-          <button
-            className={`choice-btn ${state.wallPrimer === '250' ? 'active' : ''}`}
-            onClick={() => update('wallPrimer', '250')}
-          >
-            Primer 250 Grit
-          </button>
-        </div>
-      </div>
-
-      {/* Magma 300 Wall */}
-      <div className="layer-card">
-        <div className="flex justify-between items-center mb-2">
-          <p className="text-sm font-medium">Magma 300 Large</p>
-          <button
-            className={`layer-toggle ${state.includeMagma300Wall ? 'on' : ''}`}
-            onClick={() => update('includeMagma300Wall', !state.includeMagma300Wall)}
-          />
-        </div>
-        {state.includeMagma300Wall && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">Coats:</span>
-              <button
-                className={`coat-btn ${state.magma300WallCoats === 1 ? 'active' : ''}`}
-                onClick={() => update('magma300WallCoats', 1)}
-              >
-                1
-              </button>
-              <button
-                className={`coat-btn ${state.magma300WallCoats === 2 ? 'active' : ''}`}
-                onClick={() => update('magma300WallCoats', 2)}
-              >
-                2
-              </button>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">Add pigment</span>
-              <button
-                className={`layer-toggle ${state.magma300WallPigment ? 'on' : ''}`}
-                onClick={() => update('magma300WallPigment', !state.magma300WallPigment)}
-                style={{ width: 40, height: 22 }}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Wall finish coat */}
-      <div className="layer-card">
-        <p className="text-sm font-medium mb-2">
-          Magma {state.wallFinish} {state.wallFinish === '500' ? 'Medium' : 'Smooth'}
-        </p>
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Coats:</span>
-            {state.wallFinish === '500' ? (
-              <>
-                <button
-                  className={`coat-btn ${state.wallMagma500Coats === 1 ? 'active' : ''}`}
-                  onClick={() => update('wallMagma500Coats', 1)}
-                >
-                  1
-                </button>
-                <button
-                  className={`coat-btn ${state.wallMagma500Coats === 2 ? 'active' : ''}`}
-                  onClick={() => update('wallMagma500Coats', 2)}
-                >
-                  2
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  className={`coat-btn ${state.wallMagma700Coats === 1 ? 'active' : ''}`}
-                  onClick={() => update('wallMagma700Coats', 1)}
-                >
-                  1
-                </button>
-                <button
-                  className={`coat-btn ${state.wallMagma700Coats === 2 ? 'active' : ''}`}
-                  onClick={() => update('wallMagma700Coats', 2)}
-                >
-                  2
-                </button>
-              </>
-            )}
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-500">Add pigment</span>
-            <button
-              className={`layer-toggle ${state.wallFinishPigment ? 'on' : ''}`}
-              onClick={() => update('wallFinishPigment', !state.wallFinishPigment)}
-              style={{ width: 40, height: 22 }}
-            />
-          </div>
-        </div>
-      </div>
-    </Card>
+      <p className="text-center text-xs text-gray-400 mt-8">© Magma Coatings Ltd</p>
+    </div>
   )
 }

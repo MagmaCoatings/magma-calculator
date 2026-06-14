@@ -29,7 +29,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Fetch user profile
   async function fetchProfile(userId: string) {
     const { data, error } = await supabase
       .from('profiles')
@@ -41,11 +40,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Error fetching profile:', error)
       return null
     }
-    return data as Profile
+
+    return data
   }
 
-  // Log login event
   async function logLogin(userId: string) {
+    // Prevent duplicate logs across tabs - check localStorage
+    const lockKey = `login_lock_${userId}`
+    const lastLogin = localStorage.getItem(lockKey)
+    const now = Date.now()
+    
+    // If logged within last 10 seconds, skip
+    if (lastLogin && (now - parseInt(lastLogin)) < 10000) {
+      return
+    }
+    
+    // Set lock immediately
+    localStorage.setItem(lockKey, now.toString())
+
     try {
       const ip = await getClientIP()
       const geo = ip ? await getGeoFromIP(ip) : {}
@@ -63,6 +75,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
     } catch (error) {
       console.error('Error logging login:', error)
+      // Clear lock on error so retry works
+      localStorage.removeItem(lockKey)
     }
   }
 
@@ -77,20 +91,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
     })
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    // Listen for auth changes - NO login logging here
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session)
         setUser(session?.user ?? null)
 
         if (session?.user) {
-          const userProfile = await fetchProfile(session.user.id)
-          setProfile(userProfile)
-
-          // Log login on sign in
-          if (event === 'SIGNED_IN') {
-            await logLogin(session.user.id)
-          }
+          const profile = await fetchProfile(session.user.id)
+          setProfile(profile)
         } else {
           setProfile(null)
         }
@@ -103,13 +114,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
 
     if (error) {
       return { error: error.message }
+    }
+
+    // Log login ONLY here - this only runs once per actual sign-in
+    if (data.user) {
+      await logLogin(data.user.id)
     }
 
     return {}
@@ -150,6 +166,3 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     </AuthContext.Provider>
   )
 }
-
-// Re-export the provider
-export { AuthContext }

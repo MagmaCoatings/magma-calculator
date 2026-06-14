@@ -1,79 +1,117 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/hooks/useAuth'
-import { LoginForm } from '@/components/auth/LoginForm'
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
-import { Header } from '@/components/layout/Header'
-import { Calculator } from '@/components/calculator/Calculator'
+import { LoginPage } from '@/pages/LoginPage'
+import { CalculatorPage } from '@/pages/CalculatorPage'
+import { QuotesPage } from '@/pages/QuotesPage'
+import { QuoteDetailPage } from '@/pages/QuoteDetailPage'
+import { AdminDashboard as Dashboard } from '@/pages/admin/Dashboard'
+import { ProductsPage } from '@/pages/admin/Products'
+import { UsersPage } from '@/pages/admin/Users'
+import { LoginLogsPage } from '@/pages/admin/LoginLogs'
+import { StagesPage } from '@/pages/admin/StagesPage'
+import { SystemsPage } from '@/pages/admin/SystemsPage'
+import { Layout } from '@/components/Layout'
 
-// Placeholder pages
-function QuotesPage() {
-  return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-4">My Quotes</h1>
-      <p className="text-gray-500">Quote management coming in Phase 2...</p>
-    </div>
-  )
-}
-
-function AdminPage() {
-  return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>
-      <p className="text-gray-500">Admin panel coming in Phase 2...</p>
-    </div>
-  )
-}
-
-function AppRoutes() {
-  const { user, loading } = useAuth()
+function ProtectedRoute({ children, adminOnly = false }: { children: React.ReactNode, adminOnly?: boolean }) {
+  const { user, profile, loading } = useAuth()
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-magma border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
 
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  if (adminOnly && profile?.role !== 'admin') {
+    return <Navigate to="/" replace />
+  }
+
+  return <>{children}</>
+}
+
+function AppRoutes() {
   return (
     <Routes>
-      <Route
-        path="/login"
-        element={user ? <Navigate to="/" replace /> : <LoginForm />}
-      />
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <div className="min-h-screen bg-gray-50">
-              <Header />
-              <Calculator />
-            </div>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/quotes"
-        element={
-          <ProtectedRoute>
-            <div className="min-h-screen bg-gray-50">
-              <Header />
-              <QuotesPage />
-            </div>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/*"
-        element={
-          <ProtectedRoute requireAdmin>
-            <div className="min-h-screen bg-gray-50">
-              <Header />
-              <AdminPage />
-            </div>
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/login" element={<LoginPage />} />
+      
+      <Route path="/" element={
+        <ProtectedRoute>
+          <Layout>
+            <CalculatorPage />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/quotes" element={
+        <ProtectedRoute>
+          <Layout>
+            <QuotesPage />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/quotes/:id" element={
+        <ProtectedRoute>
+          <Layout>
+            <QuoteDetailPage />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      {/* Admin Routes */}
+      <Route path="/admin" element={
+        <ProtectedRoute adminOnly>
+          <Layout>
+            <Dashboard />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/products" element={
+        <ProtectedRoute adminOnly>
+          <Layout>
+            <ProductsPage />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/users" element={
+        <ProtectedRoute adminOnly>
+          <Layout>
+            <UsersPage />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/logs" element={
+        <ProtectedRoute adminOnly>
+          <Layout>
+            <LoginLogsPage />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/stages" element={
+        <ProtectedRoute adminOnly>
+          <Layout>
+            <StagesPage />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/systems" element={
+        <ProtectedRoute adminOnly>
+          <Layout>
+            <SystemsPage />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
