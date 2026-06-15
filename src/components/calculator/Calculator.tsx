@@ -65,9 +65,9 @@ export function Calculator() {
 
   // Main state
   const [surface, setSurface] = useState<'floor' | 'wall' | 'both'>('floor')
-  const [floorArea, setFloorArea] = useState(20)
-  const [wallArea, setWallArea] = useState(10)
-  const [wastagePercent, setWastagePercent] = useState(10)
+  const [floorArea, setFloorArea] = useState<number | ''>(20)
+  const [wallArea, setWallArea] = useState<number | ''>(10)
+  const [wastagePercent, setWastagePercent] = useState<number | ''>(10)
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null)
   // For "both" mode - separate floor and wall systems
   const [floorSystemId, setFloorSystemId] = useState<string | null>(null)
@@ -141,16 +141,36 @@ export function Calculator() {
     }
   }, [surface, systems])
 
-  // Auto-refresh when window regains focus (picks up admin changes)
+  // Auto-refresh product data when window regains focus (picks up admin changes)
+  // This updates prices/names but preserves user's layer selections
   useEffect(() => {
-    function onFocus() {
-      if (selectedSystemId) {
-        handleSystemChange(selectedSystemId)
+    async function onFocus() {
+      const query = (systemId: string) => supabase
+        .from('system_products')
+        .select('*, product:products(*), stage:stages(*)')
+        .eq('system_id', systemId)
+        .order('display_order')
+      
+      if (surface === 'both') {
+        // Refresh both floor and wall products
+        if (floorSystemId) {
+          const { data } = await query(floorSystemId)
+          if (data) setFloorProducts(data)
+        }
+        if (wallSystemId) {
+          const { data } = await query(wallSystemId)
+          if (data) setWallProducts(data)
+        }
+      } else if (selectedSystemId) {
+        // Single surface mode
+        const { data } = await query(selectedSystemId)
+        if (data) setSystemProducts(data)
       }
+      // Note: NOT calling initLayerStates - preserves user selections
     }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
-  }, [selectedSystemId])
+  }, [surface, selectedSystemId, floorSystemId, wallSystemId])
 
   // Load system products when system changes (for single surface mode)
   async function handleSystemChange(systemId: string) {
@@ -314,8 +334,11 @@ export function Calculator() {
   // Calculate materials
   function calculate() {
     const items: { name: string; qty: string; units: number; unitSize: string; cost: number }[] = []
-    const floorAreaWithWastage = floorArea * (1 + wastagePercent / 100)
-    const wallAreaWithWastage = wallArea * (1 + wastagePercent / 100)
+    const floorAreaNum = floorArea === '' ? 0 : floorArea
+    const wallAreaNum = wallArea === '' ? 0 : wallArea
+    const wastageNum = wastagePercent === '' ? 0 : wastagePercent
+    const floorAreaWithWastage = floorAreaNum * (1 + wastageNum / 100)
+    const wallAreaWithWastage = wallAreaNum * (1 + wastageNum / 100)
     let totalPigmentPacks = 0
 
     // Helper to process products for a surface
@@ -385,7 +408,9 @@ export function Calculator() {
   const { items, subtotal } = calculate()
   const vat = subtotal * settings.vat_rate
   const total = subtotal + vat
-  const totalArea = surface === 'floor' ? floorArea : surface === 'wall' ? wallArea : floorArea + wallArea
+  const floorAreaNum = floorArea === '' ? 0 : floorArea
+  const wallAreaNum = wallArea === '' ? 0 : wallArea
+  const totalArea = surface === 'floor' ? floorAreaNum : surface === 'wall' ? wallAreaNum : floorAreaNum + wallAreaNum
   const costPerM2 = totalArea > 0 ? subtotal / totalArea : 0
 
   // Map items for SaveQuoteModal
@@ -480,7 +505,7 @@ export function Calculator() {
                     onClick={() => selectProduct(layer.key, sp.product_id)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                       state.selectedProductId === sp.product_id
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-orange-600 text-white'
                         : 'bg-white border border-gray-200 text-gray-700 hover:border-gray-300'
                     }`}
                   >
@@ -507,7 +532,7 @@ export function Calculator() {
                           onClick={() => setCoats(layer.key, num)}
                           className={`w-8 h-8 rounded-lg text-sm font-medium ${
                             state.coats === num
-                              ? 'bg-blue-600 text-white'
+                              ? 'bg-orange-600 text-white'
                               : 'bg-white border border-gray-200 hover:border-gray-300'
                           }`}
                         >
@@ -616,7 +641,7 @@ export function Calculator() {
                   onClick={() => setSurface(s)}
                   className={`flex-1 py-3 px-4 rounded-lg font-medium text-sm transition-all ${
                     surface === s
-                      ? 'bg-blue-50 border-blue-500 text-blue-700 border'
+                      ? 'bg-orange-50 border-orange-500 text-orange-700 border'
                       : 'bg-white border border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -636,7 +661,8 @@ export function Calculator() {
                   <input
                     type="number"
                     value={floorArea}
-                    onChange={e => setFloorArea(parseFloat(e.target.value) || 1)}
+                    onChange={e => setFloorArea(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                    onBlur={() => { if (floorArea === '' || floorArea <= 0) setFloorArea(1) }}
                     className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-center font-semibold"
                   />
                   <span className="text-sm text-gray-500">m²</span>
@@ -648,7 +674,8 @@ export function Calculator() {
                   <input
                     type="number"
                     value={wallArea}
-                    onChange={e => setWallArea(parseFloat(e.target.value) || 1)}
+                    onChange={e => setWallArea(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                    onBlur={() => { if (wallArea === '' || wallArea <= 0) setWallArea(1) }}
                     className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-center font-semibold"
                   />
                   <span className="text-sm text-gray-500">m²</span>
@@ -659,7 +686,8 @@ export function Calculator() {
                 <input
                   type="number"
                   value={wastagePercent}
-                  onChange={e => setWastagePercent(parseFloat(e.target.value) || 0)}
+                  onChange={e => setWastagePercent(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                  onBlur={() => { if (wastagePercent === '' || wastagePercent < 0) setWastagePercent(0) }}
                   className="w-16 px-2 py-2 border border-gray-200 rounded-lg text-center"
                 />
                 <span className="text-sm text-gray-500">%</span>
@@ -684,7 +712,7 @@ export function Calculator() {
                       onClick={() => handleFloorSystemChange(system.id)}
                       className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-all ${
                         floorSystemId === system.id
-                          ? 'bg-blue-50 border-blue-500 text-blue-700 border'
+                          ? 'bg-orange-50 border-orange-500 text-orange-700 border'
                           : 'bg-white border border-gray-200 hover:border-gray-300'
                       }`}
                     >
@@ -711,7 +739,7 @@ export function Calculator() {
                       onClick={() => handleWallSystemChange(system.id)}
                       className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-all ${
                         wallSystemId === system.id
-                          ? 'bg-blue-50 border-blue-500 text-blue-700 border'
+                          ? 'bg-orange-50 border-orange-500 text-orange-700 border'
                           : 'bg-white border border-gray-200 hover:border-gray-300'
                       }`}
                     >
@@ -736,7 +764,7 @@ export function Calculator() {
                       onClick={() => handleSystemChange(system.id)}
                       className={`flex-1 py-3 px-4 rounded-lg font-medium text-sm transition-all ${
                         selectedSystemId === system.id
-                          ? 'bg-blue-50 border-blue-500 text-blue-700 border'
+                          ? 'bg-orange-50 border-orange-500 text-orange-700 border'
                           : 'bg-white border border-gray-200 hover:border-gray-300'
                       }`}
                     >
@@ -945,8 +973,8 @@ export function Calculator() {
         isOpen={showSaveModal}
         onClose={() => setShowSaveModal(false)}
         surfaceType={surface}
-        floorArea={floorArea}
-        wallArea={wallArea}
+        floorArea={floorAreaNum}
+        wallArea={wallAreaNum}
         items={quoteItems}
         subtotal={subtotal}
         vat={vat}

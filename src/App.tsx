@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/hooks/useAuth'
 import { Header } from '@/components/layout/Header'
 import { LoginPage } from '@/pages/LoginPage'
+import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import { CalculatorPage } from '@/pages/CalculatorPage'
 import { QuotesPage } from '@/pages/QuotesPage'
 import { QuoteDetailPage } from '@/pages/QuoteDetailPage'
@@ -80,6 +81,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       
       {/* Main App Routes */}
       <Route path="/" element={
