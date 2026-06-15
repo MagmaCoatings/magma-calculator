@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useColours } from '@/hooks/useProducts'
+import { useSettings } from '@/hooks/useSettings'
 import { formatCurrency } from '@/lib/formatters'
-import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Copy, Check } from 'lucide-react'
+import { SaveQuoteModal } from '@/components/SaveQuoteModal'
 
 // Types
 interface System {
@@ -55,10 +56,12 @@ interface LayerState {
 
 export function Calculator() {
   const { coloursByFamily, loading: coloursLoading } = useColours()
+  const { settings, loading: settingsLoading } = useSettings()
   const [systems, setSystems] = useState<System[]>([])
   const [systemProducts, setSystemProducts] = useState<SystemProduct[]>([])
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [settingsApplied, setSettingsApplied] = useState(false)
 
   // Main state
   const [surface, setSurface] = useState<'floor' | 'wall' | 'both'>('floor')
@@ -71,13 +74,15 @@ export function Calculator() {
   const [wallSystemId, setWallSystemId] = useState<string | null>(null)
   const [floorProducts, setFloorProducts] = useState<SystemProduct[]>([])
   const [wallProducts, setWallProducts] = useState<SystemProduct[]>([])
-  const [sealerType, setSealerType] = useState<'matt' | 'satin'>('matt')
   const [selectedColour, setSelectedColour] = useState({ name: 'Natural', hex: '#E8E4DC' })
   
   // Custom colour state
   const [useCustomColour, setUseCustomColour] = useState(false)
   const [customColourName, setCustomColourName] = useState('')
   const [customColourHex, setCustomColourHex] = useState('')
+  
+  // Save quote modal
+  const [showSaveModal, setShowSaveModal] = useState(false)
 
   // Layer states - keyed by stage name or option_group (prefixed with floor_/wall_ in both mode)
   const [layerStates, setLayerStates] = useState<{ [key: string]: LayerState }>({})
@@ -108,6 +113,16 @@ export function Calculator() {
     }
     loadSystems()
   }, [])
+
+  // Apply settings defaults once loaded
+  useEffect(() => {
+    if (!settingsLoading && !settingsApplied) {
+      setFloorArea(settings.default_floor_area)
+      setWallArea(settings.default_wall_area)
+      setWastagePercent(settings.default_wastage_percent)
+      setSettingsApplied(true)
+    }
+  }, [settingsLoading, settings, settingsApplied])
 
   // Auto-select appropriate system when surface type changes
   useEffect(() => {
@@ -226,13 +241,6 @@ export function Calculator() {
       loadSurfaceProducts(wallSystemId, 'wall')
     }
   }, [surface])
-
-  function updateLayer(key: string, updates: Partial<LayerState>) {
-    setLayerStates(prev => ({
-      ...prev,
-      [key]: { ...prev[key], ...updates }
-    }))
-  }
 
   function toggleLayer(key: string) {
     setLayerStates(prev => ({
@@ -359,7 +367,7 @@ export function Calculator() {
     if (totalPigmentPacks > 0 && !isNaturalColour) {
       const allProds = surface === 'both' ? [...floorProducts, ...wallProducts] : systemProducts
       const pigmentProduct = allProds.find(sp => sp.product?.name?.toLowerCase().includes('pigment'))?.product
-      const pigmentPrice = pigmentProduct?.price || 15 // Default £15 per pot
+      const pigmentPrice = pigmentProduct?.price || settings.pigment_price
       const colourName = useCustomColour ? (customColourName || 'Custom') : selectedColour.name
       items.push({
         name: `Pigment - ${colourName}`,
@@ -375,10 +383,19 @@ export function Calculator() {
   }
 
   const { items, subtotal } = calculate()
-  const vat = subtotal * 0.2
+  const vat = subtotal * settings.vat_rate
   const total = subtotal + vat
   const totalArea = surface === 'floor' ? floorArea : surface === 'wall' ? wallArea : floorArea + wallArea
   const costPerM2 = totalArea > 0 ? subtotal / totalArea : 0
+
+  // Map items for SaveQuoteModal
+  const quoteItems = items.map(it => ({
+    code: '',
+    name: it.name,
+    quantity: it.units,
+    unitPrice: it.units ? it.cost / it.units : 0,
+    total: it.cost,
+  }))
 
   const selectedSystem = systems.find(s => s.id === selectedSystemId)
   
@@ -564,7 +581,7 @@ export function Calculator() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  if (loading || coloursLoading) {
+  if (loading || coloursLoading || settingsLoading) {
     return (
       <div className="flex items-center justify-center p-12">
         <div className="w-8 h-8 border-4 border-magma border-t-transparent rounded-full animate-spin" />
@@ -742,6 +759,23 @@ export function Calculator() {
           {/* Colour picker */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <p className="text-sm text-gray-500 mb-3">Pigment colour</p>
+            
+            {/* Natural / No Pigment option - always visible */}
+            <button
+              onClick={() => {
+                setSelectedColour({ name: 'Natural (No Pigment)', hex: '#F5F5F0' })
+                setUseCustomColour(false)
+              }}
+              className={`w-full mb-4 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                selectedColour.name.toLowerCase().includes('natural') && !useCustomColour
+                  ? 'border-gray-900 bg-gray-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="w-5 h-5 rounded border border-gray-300" style={{ backgroundColor: '#F5F5F0' }} />
+              Natural (No Pigment)
+            </button>
+            
             <div className="space-y-3">
               {coloursByFamily.map(({ family, shades }) => (
                 <div key={family.id}>
@@ -893,13 +927,31 @@ export function Calculator() {
             )}
           </div>
 
-          <Button className="w-full mt-4" size="lg">
+          <Button 
+            className="w-full mt-4" 
+            size="lg"
+            disabled={items.length === 0}
+            onClick={() => setShowSaveModal(true)}
+          >
             Save Quote
           </Button>
         </div>
       </div>
 
       <p className="text-center text-xs text-gray-400 mt-8">© Magma Coatings Ltd</p>
+      
+      {/* Save Quote Modal */}
+      <SaveQuoteModal
+        isOpen={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        surfaceType={surface}
+        floorArea={floorArea}
+        wallArea={wallArea}
+        items={quoteItems}
+        subtotal={subtotal}
+        vat={vat}
+        total={total}
+      />
     </div>
   )
 }

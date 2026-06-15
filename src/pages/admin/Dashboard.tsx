@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Users, Package, LogIn, AlertTriangle, FileText, ChevronRight, Layers } from 'lucide-react'
+import { Users, Package, LogIn, AlertTriangle, FileText, ChevronRight } from 'lucide-react'
 
 interface Stats {
   totalUsers: number

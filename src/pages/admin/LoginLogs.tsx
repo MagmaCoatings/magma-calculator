@@ -158,7 +158,7 @@ export function LoginLogsPage() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       <div className="flex items-center gap-2">
-                        {getDeviceIcon(log.device_type)}
+                        {getDeviceIcon(log.device_type || undefined)}
                         <span className="capitalize">{log.device_type || 'Unknown'}</span>
                       </div>
                     </td>

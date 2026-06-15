@@ -71,7 +71,7 @@ export function useColours() {
   // Group colours by family
   const coloursByFamily = families.map(family => ({
     family,
-    shades: colours.filter(c => c.family_id === family.id),
+    shades: colours.filter(c => c.family === family.name),
   }))
 
   return { colours, families, coloursByFamily, loading, error }

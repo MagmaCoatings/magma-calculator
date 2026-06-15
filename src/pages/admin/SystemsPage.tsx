@@ -126,13 +126,16 @@ export function SystemsPage() {
   const [editingProduct, setEditingProduct] = useState<SystemProduct | null>(null)
   const [productForm, setProductForm] = useState<SystemProductForm>({
     is_optional: false,
+    is_default_option: false,
     default_coats: 1,
     min_coats: 1,
     max_coats: 1,
     has_pigment: false,
+    pigment_default_on: false,
     coverage_sqm: 0,
     coverage_note: '',
     option_group: '',
+    depends_on_product_id: "",
   })
   const [showProductModal, setShowProductModal] = useState(false)
   const [isAddingProduct, setIsAddingProduct] = useState(false)
@@ -284,29 +287,6 @@ export function SystemsPage() {
     setSelectedSystem(system)
     setView('edit')
     fetchSystemDetails(system.id)
-  }
-
-  async function removeStageProduct(id: string) {
-    if (!confirm('Remove this product from the system?')) return
-    await supabase.from('system_products').delete().eq('id', id)
-    setSystemProducts(systemProducts.filter(sp => sp.id !== id))
-  }
-
-  async function setStageProductDefault(sp: SystemProduct) {
-    if (!sp.option_group) return
-    await supabase
-      .from('system_products')
-      .update({ is_default_option: false })
-      .eq('system_id', sp.system_id)
-      .eq('option_group', sp.option_group)
-    await supabase
-      .from('system_products')
-      .update({ is_default_option: true })
-      .eq('id', sp.id)
-    setSystemProducts(systemProducts.map(s => ({
-      ...s,
-      is_default_option: s.option_group === sp.option_group ? s.id === sp.id : s.is_default_option
-    })))
   }
 
   // =========================================
@@ -1154,7 +1134,6 @@ export function SystemsPage() {
                   ) : (
                     <div className="space-y-2">
                       {presetProducts.map((pp, idx) => {
-                        const prod = products.find(p => p.id === pp.product_id)
                         return (
                           <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
                             <div className="flex flex-col gap-1">

@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
-import { LogOut, User, Settings, Calculator, FileText } from 'lucide-react'
+import { LogOut, Settings, Calculator, FileText } from 'lucide-react'
 
 export function Header() {
   const { profile, signOut } = useAuth()
