@@ -8,6 +8,7 @@ interface AuthContextType {
   profile: Profile | null
   session: Session | null
   loading: boolean
+  authError: string | null
   signIn: (email: string, password: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ error?: string }>
@@ -28,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [authError, setAuthError] = useState<string | null>(null)
 
   async function fetchProfile(userId: string) {
     const { data, error } = await supabase
@@ -81,14 +83,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    // Timeout fallback - don't leave users stuck on spinner
+    const timeout = setTimeout(() => {
+      if (loading) {
+        console.warn('Auth loading timed out after 10s')
+        setLoading(false)
+        setAuthError('Loading timed out. Please refresh the page.')
+      }
+    }, 10000)
+
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
-        fetchProfile(session.user.id).then(setProfile)
+        const profile = await fetchProfile(session.user.id)
+        setProfile(profile)
       }
       setLoading(false)
+      clearTimeout(timeout)
+    }).catch(err => {
+      console.error('Auth error:', err)
+      setLoading(false)
+      setAuthError('Failed to load session. Please refresh.')
+      clearTimeout(timeout)
     })
 
     // Listen for auth changes - NO login logging here
@@ -157,6 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profile,
         session,
         loading,
+        authError,
         signIn,
         signOut,
         resetPassword,

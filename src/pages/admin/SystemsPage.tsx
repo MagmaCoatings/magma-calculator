@@ -110,6 +110,12 @@ export function SystemsPage() {
   const [showAddSystem, setShowAddSystem] = useState(false)
   const [newSystem, setNewSystem] = useState({ name: '', description: '', surface_type: 'floor' as const })
 
+  // System editing state (rename/delete)
+  const [editingSystemId, setEditingSystemId] = useState<string | null>(null)
+  const [editSystemName, setEditSystemName] = useState('')
+  const [editSystemDescription, setEditSystemDescription] = useState('')
+  const [deletingSystemId, setDeletingSystemId] = useState<string | null>(null)
+
   // Preset editing state
   const [editingPreset, setEditingPreset] = useState<FinishPreset | null>(null)
   const [presetForm, setPresetForm] = useState({ name: '', description: '' })
@@ -210,6 +216,67 @@ export function SystemsPage() {
       .eq('id', system.id)
     if (!error) {
       setSystems(systems.map(s => s.id === system.id ? { ...s, is_active: !s.is_active } : s))
+    }
+  }
+
+  // Start editing a system's name/description
+  function startEditSystem(system: System, e: React.MouseEvent) {
+    e.stopPropagation()
+    setEditingSystemId(system.id)
+    setEditSystemName(system.name)
+    setEditSystemDescription(system.description || '')
+  }
+
+  // Save system name/description changes
+  async function saveSystemEdit() {
+    if (!editingSystemId || !editSystemName.trim()) return
+    
+    const { error } = await supabase
+      .from('systems')
+      .update({ 
+        name: editSystemName.trim(),
+        description: editSystemDescription.trim() || null
+      })
+      .eq('id', editingSystemId)
+    
+    if (!error) {
+      setSystems(systems.map(s => 
+        s.id === editingSystemId 
+          ? { ...s, name: editSystemName.trim(), description: editSystemDescription.trim() || null }
+          : s
+      ))
+      setEditingSystemId(null)
+      setEditSystemName('')
+      setEditSystemDescription('')
+    }
+  }
+
+  // Cancel editing
+  function cancelSystemEdit() {
+    setEditingSystemId(null)
+    setEditSystemName('')
+    setEditSystemDescription('')
+  }
+
+  // Confirm delete system
+  async function confirmDeleteSystem() {
+    if (!deletingSystemId) return
+    
+    // First delete all system_products for this system
+    await supabase
+      .from('system_products')
+      .delete()
+      .eq('system_id', deletingSystemId)
+    
+    // Then delete the system itself
+    const { error } = await supabase
+      .from('systems')
+      .delete()
+      .eq('id', deletingSystemId)
+    
+    if (!error) {
+      setSystems(systems.filter(s => s.id !== deletingSystemId))
+      setDeletingSystemId(null)
     }
   }
 
@@ -1259,47 +1326,103 @@ export function SystemsPage() {
         {systems.map(system => (
           <Card
             key={system.id}
-            className={`cursor-pointer transition-all hover:shadow-md ${!system.is_active ? 'opacity-60' : ''}`}
+            className={`transition-all hover:shadow-md ${!system.is_active ? 'opacity-60' : ''}`}
           >
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1" onClick={() => openSystem(system)}>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-gray-900">{system.name}</h3>
-                    <span className={`px-2 py-0.5 text-xs rounded ${
-                      system.surface_type === 'floor' ? 'bg-blue-100 text-blue-700' :
-                      system.surface_type === 'wall' ? 'bg-green-100 text-green-700' :
-                      'bg-purple-100 text-purple-700'
-                    }`}>
-                      {system.surface_type}
-                    </span>
-                    {!system.is_active && (
-                      <span className="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-500">inactive</span>
+              {editingSystemId === system.id ? (
+                // Edit mode
+                <div className="space-y-3">
+                  <Input
+                    value={editSystemName}
+                    onChange={e => setEditSystemName(e.target.value)}
+                    placeholder="System name"
+                    className="font-semibold"
+                    autoFocus
+                  />
+                  <Input
+                    value={editSystemDescription}
+                    onChange={e => setEditSystemDescription(e.target.value)}
+                    placeholder="Description (optional)"
+                    className="text-sm"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={cancelSystemEdit}>
+                      <X className="w-4 h-4 mr-1" /> Cancel
+                    </Button>
+                    <Button size="sm" onClick={saveSystemEdit}>
+                      <Check className="w-4 h-4 mr-1" /> Save
+                    </Button>
+                  </div>
+                </div>
+              ) : deletingSystemId === system.id ? (
+                // Delete confirmation
+                <div className="space-y-3">
+                  <p className="text-red-600 font-medium">Delete "{system.name}"?</p>
+                  <p className="text-sm text-gray-500">This will remove the system and all its product configurations. This cannot be undone.</p>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setDeletingSystemId(null)}>
+                      Cancel
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={confirmDeleteSystem}>
+                      <Trash2 className="w-4 h-4 mr-1" /> Delete
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                // Normal view
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 cursor-pointer" onClick={() => openSystem(system)}>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-gray-900">{system.name}</h3>
+                      <span className={`px-2 py-0.5 text-xs rounded ${
+                        system.surface_type === 'floor' ? 'bg-blue-100 text-blue-700' :
+                        system.surface_type === 'wall' ? 'bg-green-100 text-green-700' :
+                        'bg-purple-100 text-purple-700'
+                      }`}>
+                        {system.surface_type}
+                      </span>
+                      {!system.is_active && (
+                        <span className="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-500">inactive</span>
+                      )}
+                    </div>
+                    {system.description && (
+                      <p className="text-sm text-gray-500 mt-1">{system.description}</p>
                     )}
                   </div>
-                  {system.description && (
-                    <p className="text-sm text-gray-500 mt-1">{system.description}</p>
-                  )}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={e => startEditSystem(system, e)}
+                      className="p-2 hover:bg-gray-100 rounded-lg"
+                      title="Rename"
+                    >
+                      <Pencil className="w-4 h-4 text-gray-400" />
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); setDeletingSystemId(system.id) }}
+                      className="p-2 hover:bg-red-50 rounded-lg"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4 text-red-400" />
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); toggleSystemActive(system) }}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg ${
+                        system.is_active
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      }`}
+                    >
+                      {system.is_active ? 'Active' : 'Inactive'}
+                    </button>
+                    <button
+                      onClick={() => openSystem(system)}
+                      className="p-2 hover:bg-gray-100 rounded-lg"
+                    >
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={e => { e.stopPropagation(); toggleSystemActive(system) }}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-lg ${
-                      system.is_active
-                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                    }`}
-                  >
-                    {system.is_active ? 'Active' : 'Inactive'}
-                  </button>
-                  <button
-                    onClick={() => openSystem(system)}
-                    className="p-2 hover:bg-gray-100 rounded-lg"
-                  >
-                    <ChevronRight className="w-5 h-5 text-gray-400" />
-                  </button>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         ))}

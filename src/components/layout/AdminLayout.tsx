@@ -1,92 +1,97 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { Button } from '@/components/ui/button'
 import { 
-  LogOut, 
   LayoutDashboard, 
   Package, 
   Users, 
   FileText, 
-  Calculator,
-  ChevronLeft
+  Layers, 
+  Settings,
+  LogOut,
+  Calculator
 } from 'lucide-react'
 
 interface AdminLayoutProps {
   children: React.ReactNode
 }
 
+const navItems = [
+  { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/admin/products', label: 'Products', icon: Package },
+  { path: '/admin/systems', label: 'Systems', icon: Layers },
+  { path: '/admin/stages', label: 'Stages', icon: FileText },
+  { path: '/admin/users', label: 'Users', icon: Users },
+  { path: '/admin/logs', label: 'Login Logs', icon: FileText },
+  { path: '/admin/settings', label: 'Settings', icon: Settings },
+]
+
 export function AdminLayout({ children }: AdminLayoutProps) {
-  const { profile, signOut } = useAuth()
   const location = useLocation()
-
-  const navItems = [
-    { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/admin/products', label: 'Products', icon: Package },
-    { path: '/admin/users', label: 'Users', icon: Users },
-    { path: '/admin/logs', label: 'Login Logs', icon: FileText },
-  ]
-
-  const isActive = (path: string) => {
-    if (path === '/admin') return location.pathname === '/admin'
-    return location.pathname.startsWith(path)
-  }
+  const { signOut } = useAuth()
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top header */}
-      <header className="bg-charcoal text-white">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center justify-between h-14">
-            <div className="flex items-center gap-4">
-              <span className="text-xl font-bold text-magma">MAGMA</span>
-              <span className="text-sm text-gray-400">Admin Panel</span>
+      <header className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-lg">M</span>
             </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-300">{profile?.full_name}</span>
-              <Button variant="ghost" size="sm" onClick={signOut} className="text-gray-300 hover:text-white hover:bg-white/10">
-                <LogOut className="w-4 h-4" />
-              </Button>
+            <div>
+              <h1 className="font-bold text-gray-900">Magma Admin</h1>
+              <p className="text-xs text-gray-500">Calculator Management</p>
             </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link 
+              to="/"
+              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
+            >
+              <Calculator className="w-4 h-4" />
+              Calculator
+            </Link>
+            <button
+              onClick={() => signOut()}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign Out
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Sub navigation */}
-      <nav className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              {navItems.map(item => (
+      <div className="flex">
+        {/* Sidebar */}
+        <aside className="w-64 bg-white border-r border-gray-200 min-h-[calc(100vh-73px)]">
+          <nav className="p-4 space-y-1">
+            {navItems.map(item => {
+              const Icon = item.icon
+              const isActive = location.pathname === item.path
+              return (
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition ${
-                    isActive(item.path)
-                      ? 'border-magma text-magma'
-                      : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300'
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
+                    isActive
+                      ? 'bg-orange-50 text-orange-700'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }`}
                 >
-                  <item.icon className="w-4 h-4" />
+                  <Icon className={`w-5 h-5 ${isActive ? 'text-orange-600' : 'text-gray-400'}`} />
                   {item.label}
                 </Link>
-              ))}
-            </div>
-            <Link
-              to="/"
-              className="flex items-center gap-2 px-4 py-3 text-sm text-gray-500 hover:text-magma"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              <Calculator className="w-4 h-4" />
-              Back to Calculator
-            </Link>
-          </div>
-        </div>
-      </nav>
+              )
+            })}
+          </nav>
+        </aside>
 
-      {/* Content */}
-      <main>
-        {children}
-      </main>
+        {/* Main content */}
+        <main className="flex-1 p-6">
+          {children}
+        </main>
+      </div>
     </div>
   )
 }
