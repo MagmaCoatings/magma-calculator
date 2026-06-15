@@ -31,48 +31,40 @@ export function useProducts() {
 
 export function useColours() {
   const [colours, setColours] = useState<ColourSwatch[]>([])
-  const [families, setFamilies] = useState<ColourFamily[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchColours() {
-      // Fetch families
-      const { data: familiesData, error: familiesError } = await supabase
-        .from('colour_families')
-        .select('*')
-        .order('display_order')
+      try {
+        const { data, error: queryError } = await supabase
+          .from('colours')
+          .select('*')
+          .order('display_order')
 
-      if (familiesError) {
-        setError(familiesError.message)
+        if (queryError) {
+          setError(queryError.message)
+        } else if (data) {
+          setColours(data as ColourSwatch[])
+        }
+      } catch {
+        setError('Failed to load colours')
+      } finally {
         setLoading(false)
-        return
       }
-
-      // Fetch swatches
-      const { data: swatchesData, error: swatchesError } = await supabase
-        .from('colour_swatches')
-        .select('*, family:colour_families(id, name)')
-        .eq('is_active', true)
-        .order('display_order')
-
-      if (swatchesError) {
-        setError(swatchesError.message)
-      } else {
-        setFamilies(familiesData as ColourFamily[])
-        setColours(swatchesData as ColourSwatch[])
-      }
-      setLoading(false)
     }
 
     fetchColours()
   }, [])
 
+  // Get unique family names
+  const familyNames = [...new Set(colours.map(c => c.family))].filter(Boolean)
+  
   // Group colours by family
-  const coloursByFamily = families.map(family => ({
-    family,
-    shades: colours.filter(c => c.family === family.name),
+  const coloursByFamily = familyNames.map(familyName => ({
+    family: { id: familyName, name: familyName, display_order: 0 } as ColourFamily,
+    shades: colours.filter(c => c.family === familyName),
   }))
 
-  return { colours, families, coloursByFamily, loading, error }
+  return { colours, coloursByFamily, loading, error }
 }
