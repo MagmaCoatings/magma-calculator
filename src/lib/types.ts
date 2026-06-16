@@ -8,6 +8,7 @@ export interface Profile {
   company_name: string | null
   role: 'admin' | 'installer'
   status: 'active' | 'suspended' | 'pending'
+  show_tooltips?: boolean
   created_at: string
   updated_at: string
 }

@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useColours } from '@/hooks/useProducts'
 import { useSettings } from '@/hooks/useSettings'
+import { useAuth } from '@/hooks/useAuth'
 import { formatCurrency } from '@/lib/formatters'
 import { Button } from '@/components/ui/button'
+import { InfoTip } from '@/components/ui/InfoTip'
 import { Copy, Check } from 'lucide-react'
 import { SaveQuoteModal } from '@/components/SaveQuoteModal'
 
@@ -36,6 +38,7 @@ interface SystemProduct {
   product: {
     id: string
     name: string
+    description: string | null
     pack_size: number
     pack_unit: string
     price: number
@@ -57,6 +60,8 @@ interface LayerState {
 export function Calculator() {
   const { coloursByFamily, loading: coloursLoading } = useColours()
   const { settings, loading: settingsLoading } = useSettings()
+  const { profile } = useAuth()
+  const showTooltips = profile?.show_tooltips ?? true
   const [systems, setSystems] = useState<System[]>([])
   const [systemProducts, setSystemProducts] = useState<SystemProduct[]>([])
   const [loading, setLoading] = useState(true)
@@ -498,10 +503,13 @@ export function Calculator() {
         {/* Layer header */}
         <div className="flex justify-between items-start">
           <div>
-            <p className="font-medium text-gray-900">
+            <p className="font-medium text-gray-900 flex items-center gap-1.5">
               {hasMultipleProducts 
                 ? stageName 
                 : selectedProduct?.product?.name || layer.products[0]?.product?.name || stageName}
+              {showTooltips && !hasMultipleProducts && selectedProduct && (
+                <InfoTip content={selectedProduct.coverage_note || selectedProduct.product?.description || ''} />
+              )}
             </p>
             {selectedProduct?.coverage_note && (
               <p className="text-xs text-gray-500 mt-0.5">{selectedProduct.coverage_note}</p>
@@ -528,17 +536,21 @@ export function Calculator() {
             {hasMultipleProducts && (
               <div className="flex flex-wrap gap-2 mt-3">
                 {layer.products.map(sp => (
-                  <button
-                    key={sp.product_id}
-                    onClick={() => selectProduct(layer.key, sp.product_id)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                      state.selectedProductId === sp.product_id
-                        ? 'bg-orange-600 text-white'
-                        : 'bg-white border border-gray-200 text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    {sp.product?.name?.replace('Magma ', '').replace(' Microcement', '') || 'Product'}
-                  </button>
+                  <div key={sp.product_id} className="flex items-center gap-1">
+                    <button
+                      onClick={() => selectProduct(layer.key, sp.product_id)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                        state.selectedProductId === sp.product_id
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-white border border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      {sp.product?.name?.replace('Magma ', '').replace(' Microcement', '') || 'Product'}
+                    </button>
+                    {showTooltips && (sp.coverage_note || sp.product?.description) && (
+                      <InfoTip content={sp.coverage_note || sp.product?.description || ''} />
+                    )}
+                  </div>
                 ))}
               </div>
             )}
