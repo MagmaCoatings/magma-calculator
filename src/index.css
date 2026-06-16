@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 @theme {
-  /* Brand - sampled from Magma logo */
-  --color-molten: #DE7A1A;
-  --color-molten-ink: #B5610E;
-  --color-molten-tint: #FBF0E4;
+  /* Brand - exact orange sampled from Magma-Logo.jpg */
+  --color-molten: #F0851E;
+  --color-molten-ink: #B05E0E;
+  --color-molten-tint: #FCEFDF;
 
   /* Mineral neutrals */
   --color-basalt: #211F1D;
@@ -24,8 +24,8 @@
   --color-danger-tint: #F6E9E6;
 
   /* Legacy compatibility */
-  --color-magma: #DE7A1A;
-  --color-magma-dark: #B5610E;
+  --color-magma: #F0851E;
+  --color-magma-dark: #B05E0E;
 
   /* Radii */
   --radius-card: 12px;

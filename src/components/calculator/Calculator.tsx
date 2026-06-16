@@ -1203,7 +1203,10 @@ export function Calculator() {
         <div className="px-4 py-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-stone text-sm">Total</span>
-            <span className="text-xl font-medium text-basalt total-accent">£{formatCurrency(total)}</span>
+            <span className="text-xl font-medium text-basalt">
+              <span className="total-accent">£{formatCurrency(subtotal)}</span>
+              <span className="text-sm font-normal text-stone ml-1.5">+ VAT</span>
+            </span>
           </div>
           <div className="flex gap-2">
             <Button 
