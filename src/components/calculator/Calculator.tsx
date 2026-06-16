@@ -6,8 +6,9 @@ import { useAuth } from '@/hooks/useAuth'
 import { formatCurrency } from '@/lib/formatters'
 import { Button } from '@/components/ui/button'
 import { InfoTip } from '@/components/ui/InfoTip'
-import { Copy, Check } from 'lucide-react'
+import { Copy, Check, ChevronUp } from 'lucide-react'
 import { SaveQuoteModal } from '@/components/SaveQuoteModal'
+import { MagmaSpinner } from '@/components/brand/MagmaMark'
 
 // Types
 interface System {
@@ -634,13 +635,13 @@ export function Calculator() {
         : null
 
     return (
-      <div key={layer.key} className={`bg-gray-50 border border-gray-100 rounded-lg p-4 ${
+      <div key={layer.key} className={`bg-bone border border-line rounded-xl p-5 ${
         layer.isOptional && !state.enabled ? 'opacity-60' : ''
       }`}>
         {/* Layer header */}
         <div className="flex justify-between items-start">
           <div>
-            <p className="font-medium text-gray-900 flex items-center gap-1.5">
+            <p className="font-medium text-basalt flex items-center gap-1.5">
               {hasMultipleProducts 
                 ? stageName 
                 : selectedProduct?.product?.name || layer.products[0]?.product?.name || stageName}
@@ -649,17 +650,17 @@ export function Calculator() {
               )}
             </p>
             {selectedProduct?.coverage_note && (
-              <p className="text-xs text-gray-500 mt-0.5">{selectedProduct.coverage_note}</p>
+              <p className="text-xs text-stone mt-0.5">{selectedProduct.coverage_note}</p>
             )}
           </div>
           {layer.isOptional && (
             <button
               onClick={() => toggleLayer(layer.key)}
               className={`w-12 h-6 rounded-full transition-colors relative ${
-                state.enabled ? 'bg-green-500' : 'bg-gray-300'
+                state.enabled ? 'bg-sage' : 'bg-ash'
               }`}
             >
-              <div className={`w-5 h-5 rounded-full bg-white shadow absolute top-0.5 transition-transform ${
+              <div className={`w-5 h-5 rounded-full bg-bone shadow absolute top-0.5 transition-transform ${
                 state.enabled ? 'translate-x-6' : 'translate-x-0.5'
               }`} />
             </button>
@@ -678,8 +679,8 @@ export function Calculator() {
                       onClick={() => selectProduct(layer.key, sp.product_id)}
                       className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                         state.selectedProductId === sp.product_id
-                          ? 'bg-orange-600 text-white'
-                          : 'bg-white border border-gray-200 text-gray-700 hover:border-gray-300'
+                          ? 'bg-basalt text-bone border-2 border-basalt font-medium'
+                          : 'bg-bone border border-line text-ink hover:border-stone'
                       }`}
                     >
                       {sp.product?.name?.replace('Magma ', '').replace(' Microcement', '') || 'Product'}
@@ -694,11 +695,11 @@ export function Calculator() {
 
             {/* Coats and pigment */}
             {(hasCoatOptions || hasPigmentOption || fixedCoats) && (
-              <div className="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t border-gray-200">
+              <div className="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t border-line">
                 {/* Coat selector */}
                 {hasCoatOptions && selectedProduct && (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500">Coats:</span>
+                    <span className="text-xs text-stone">Coats:</span>
                     <div className="flex gap-1">
                       {Array.from(
                         { length: (selectedProduct.max_coats || 1) - (selectedProduct.min_coats || 1) + 1 },
@@ -707,10 +708,10 @@ export function Calculator() {
                         <button
                           key={num}
                           onClick={() => setCoats(layer.key, num)}
-                          className={`w-8 h-8 rounded-lg text-sm font-medium ${
+                          className={`w-8 h-8 rounded-lg text-sm font-medium min-h-[44px] min-w-[44px] ${
                             state.coats === num
-                              ? 'bg-orange-600 text-white'
-                              : 'bg-white border border-gray-200 hover:border-gray-300'
+                              ? 'bg-basalt text-bone border-2 border-basalt font-medium'
+                              : 'bg-bone border border-line text-ink hover:border-stone'
                           }`}
                         >
                           {num}
@@ -722,21 +723,21 @@ export function Calculator() {
                 {/* Fixed coats badge */}
                 {fixedCoats && !hasCoatOptions && (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500">Coats:</span>
-                    <span className="px-2 py-1 bg-gray-100 rounded text-sm font-medium">{fixedCoats}</span>
+                    <span className="text-xs text-stone">Coats:</span>
+                    <span className="px-2 py-1 bg-line-soft rounded text-sm font-medium">{fixedCoats}</span>
                   </div>
                 )}
                 {/* Pigment toggle */}
                 {hasPigmentOption && (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500">Add pigment:</span>
+                    <span className="text-xs text-stone">Add pigment:</span>
                     <button
                       onClick={() => !layer.isOptional || state.enabled ? togglePigment(layer.key) : null}
                       className={`w-10 h-5 rounded-full transition-colors relative ${
-                        state.pigment ? 'bg-green-500' : 'bg-gray-300'
+                        state.pigment ? 'bg-sage' : 'bg-ash'
                       }`}
                     >
-                      <div className={`w-4 h-4 rounded-full bg-white shadow absolute top-0.5 transition-transform ${
+                      <div className={`w-4 h-4 rounded-full bg-bone shadow absolute top-0.5 transition-transform ${
                         state.pigment ? 'translate-x-5' : 'translate-x-0.5'
                       }`} />
                     </button>
@@ -777,6 +778,7 @@ export function Calculator() {
     text += `\nTOTAL: £${formatCurrency(total)}`
     text += `\n\nCost per m² (ex VAT): £${formatCurrency(costPerM2)}`
     text += `\n\n* Includes ${wastagePercent}% wastage`
+    text += `\n\nPallet / Delivery Costs: TBC - quoted at time of order`
 
     navigator.clipboard.writeText(text)
     setCopied(true)
@@ -786,7 +788,7 @@ export function Calculator() {
   if (loading || coloursLoading || settingsLoading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <div className="w-8 h-8 border-4 border-magma border-t-transparent rounded-full animate-spin" />
+        <MagmaSpinner size={48} />
       </div>
     )
   }
@@ -794,17 +796,17 @@ export function Calculator() {
   if (error) {
     return (
       <div className="max-w-md mx-auto px-4 py-12">
-        <div className="bg-white border border-red-200 rounded-xl p-6 text-center">
-          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="bg-bone border border-danger/20 rounded-xl p-6 text-center">
+          <div className="w-12 h-12 bg-danger-tint rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-6 h-6 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Something went wrong</h2>
-          <p className="text-gray-600 text-sm mb-4">{error}</p>
+          <h2 className="text-lg font-medium text-basalt mb-2">Something went wrong</h2>
+          <p className="text-stone text-sm mb-4">{error}</p>
           <button
             onClick={() => loadSystems()}
-            className="px-4 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 transition-colors"
+            className="px-4 py-2 bg-molten text-white rounded-lg font-medium hover:bg-molten-ink transition-colors min-h-[44px]"
           >
             Try Again
           </button>
@@ -824,23 +826,18 @@ export function Calculator() {
   })
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900">Magma Calculator</h1>
-        <p className="text-gray-500 text-sm mt-1">Material estimator for microcement systems</p>
-      </div>
-
+    <div className="max-w-4xl mx-auto px-4 py-8 pb-52 lg:pb-6">
       {/* Family selector - only show if there are multiple families */}
       {families.length > 1 && (
-        <div className="flex justify-center gap-2 mb-6">
+        <div className="flex justify-center gap-2 mb-8">
           {families.map(family => (
             <button
               key={family}
               onClick={() => handleFamilyChange(family)}
-              className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all ${
+              className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all min-h-[44px] ${
                 selectedFamily === family
-                  ? 'bg-gray-900 text-white shadow-md'
-                  : 'bg-white border border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                  ? 'bg-basalt text-bone'
+                  : 'bg-bone border border-line text-ink hover:border-stone'
               }`}
             >
               {family}
@@ -849,21 +846,21 @@ export function Calculator() {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-[1fr_340px] gap-6">
+      <div className="grid lg:grid-cols-[1fr_340px] gap-8">
         {/* Configuration */}
-        <div className="space-y-4">
+        <div className="space-y-5">
           {/* Surface type */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <p className="text-sm text-gray-500 mb-3">Surface type</p>
-            <div className="flex gap-2">
+          <div className="bg-bone border border-line rounded-xl p-5">
+            <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3">Surface type</p>
+            <div className="bg-track rounded-lg p-1 flex gap-1">
               {(['floor', 'wall', 'both'] as const).map(s => (
                 <button
                   key={s}
                   onClick={() => setSurface(s)}
-                  className={`flex-1 py-3 px-4 rounded-lg font-medium text-sm transition-all ${
+                  className={`flex-1 py-2.5 px-4 rounded-md font-medium text-sm transition-all min-h-[44px] ${
                     surface === s
-                      ? 'bg-orange-50 border-orange-500 text-orange-700 border'
-                      : 'bg-white border border-gray-200 hover:border-gray-300'
+                      ? 'bg-bone text-basalt shadow-sm'
+                      : 'text-stone hover:text-ink'
                   }`}
                 >
                   {s === 'floor' ? 'Floor' : s === 'wall' ? 'Wall' : 'Floor + Wall'}
@@ -873,45 +870,48 @@ export function Calculator() {
           </div>
 
           {/* Area */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <p className="text-sm text-gray-500 mb-3">Area</p>
+          <div className="bg-bone border border-line rounded-xl p-5">
+            <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3">Area</p>
             <div className="flex flex-wrap items-center gap-4">
               {(surface === 'floor' || surface === 'both') && (
                 <div className="flex items-center gap-2">
-                  <label className="text-sm text-gray-600 font-medium">Floor:</label>
+                  <label className="text-sm text-ink font-medium">Floor:</label>
                   <input
                     type="number"
+                    inputMode="decimal"
                     value={floorArea}
                     onChange={e => setFloorArea(e.target.value === '' ? '' : parseFloat(e.target.value))}
                     onBlur={() => { if (floorArea === '' || floorArea <= 0) setFloorArea(1) }}
-                    className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-center font-semibold"
+                    className="w-20 px-3 py-2 border border-line rounded-lg text-base text-center font-medium bg-bone min-h-[44px]"
                   />
-                  <span className="text-sm text-gray-500">m²</span>
+                  <span className="text-sm text-stone">m²</span>
                 </div>
               )}
               {(surface === 'wall' || surface === 'both') && (
                 <div className="flex items-center gap-2">
-                  <label className="text-sm text-gray-600 font-medium">Wall:</label>
+                  <label className="text-sm text-ink font-medium">Wall:</label>
                   <input
                     type="number"
+                    inputMode="decimal"
                     value={wallArea}
                     onChange={e => setWallArea(e.target.value === '' ? '' : parseFloat(e.target.value))}
                     onBlur={() => { if (wallArea === '' || wallArea <= 0) setWallArea(1) }}
-                    className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-center font-semibold"
+                    className="w-20 px-3 py-2 border border-line rounded-lg text-base text-center font-medium bg-bone min-h-[44px]"
                   />
-                  <span className="text-sm text-gray-500">m²</span>
+                  <span className="text-sm text-stone">m²</span>
                 </div>
               )}
               <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-500">Wastage:</label>
+                <label className="text-sm text-stone">Wastage:</label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   value={wastagePercent}
                   onChange={e => setWastagePercent(e.target.value === '' ? '' : parseFloat(e.target.value))}
                   onBlur={() => { if (wastagePercent === '' || wastagePercent < 0) setWastagePercent(0) }}
-                  className="w-16 px-2 py-2 border border-gray-200 rounded-lg text-center"
+                  className="w-16 px-2 py-2 border border-line rounded-lg text-base text-center bg-bone min-h-[44px]"
                 />
-                <span className="text-sm text-gray-500">%</span>
+                <span className="text-sm text-stone">%</span>
               </div>
             </div>
           </div>
@@ -920,21 +920,21 @@ export function Calculator() {
           {surface === 'both' ? (
             <>
               {/* Floor configuration */}
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <div className="bg-bone border border-line rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded bg-orange-500 text-white text-xs font-bold flex items-center justify-center">F</div>
-                  <p className="text-sm font-medium text-gray-700">Floor configuration</p>
+                  <div className="w-6 h-6 rounded bg-basalt text-white text-xs font-medium flex items-center justify-center">F</div>
+                  <p className="text-sm font-medium text-ink">Floor configuration</p>
                 </div>
-                <p className="text-xs text-gray-400 mb-2">Build type</p>
-                <div className="flex gap-2 mb-4">
+                <p className="text-xs font-medium text-stone uppercase tracking-wide mb-2">Build type</p>
+                <div className="bg-track rounded-lg p-1 flex gap-1 mb-4">
                   {systems.filter(s => s.surface_type === 'floor' && (!selectedFamily || s.family === selectedFamily)).map(system => (
                     <button
                       key={system.id}
                       onClick={() => handleFloorSystemChange(system.id)}
-                      className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-all ${
+                      className={`flex-1 py-2 px-3 rounded-md font-medium text-sm transition-all min-h-[44px] ${
                         floorSystemId === system.id
-                          ? 'bg-orange-50 border-orange-500 text-orange-700 border'
-                          : 'bg-white border border-gray-200 hover:border-gray-300'
+                          ? 'bg-bone text-basalt shadow-sm'
+                          : 'text-stone hover:text-ink'
                       }`}
                     >
                       {system.name.replace('Floor ', '')}
@@ -947,21 +947,21 @@ export function Calculator() {
               </div>
 
               {/* Wall configuration */}
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <div className="bg-bone border border-line rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded bg-blue-500 text-white text-xs font-bold flex items-center justify-center">W</div>
-                  <p className="text-sm font-medium text-gray-700">Wall configuration</p>
+                  <div className="w-6 h-6 rounded bg-basalt text-white text-xs font-medium flex items-center justify-center">W</div>
+                  <p className="text-sm font-medium text-ink">Wall configuration</p>
                 </div>
-                <p className="text-xs text-gray-400 mb-2">Build type</p>
-                <div className="flex gap-2 mb-4">
+                <p className="text-xs font-medium text-stone uppercase tracking-wide mb-2">Build type</p>
+                <div className="bg-track rounded-lg p-1 flex gap-1 mb-4">
                   {systems.filter(s => s.surface_type === 'wall' && (!selectedFamily || s.family === selectedFamily)).map(system => (
                     <button
                       key={system.id}
                       onClick={() => handleWallSystemChange(system.id)}
-                      className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-all ${
+                      className={`flex-1 py-2 px-3 rounded-md font-medium text-sm transition-all min-h-[44px] ${
                         wallSystemId === system.id
-                          ? 'bg-orange-50 border-orange-500 text-orange-700 border'
-                          : 'bg-white border border-gray-200 hover:border-gray-300'
+                          ? 'bg-bone text-basalt shadow-sm'
+                          : 'text-stone hover:text-ink'
                       }`}
                     >
                       {system.name.replace('Wall ', '')}
@@ -976,17 +976,17 @@ export function Calculator() {
           ) : (
             <>
               {/* Single surface mode */}
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <p className="text-sm text-gray-500 mb-3">Build type</p>
-                <div className="flex gap-2">
+              <div className="bg-bone border border-line rounded-xl p-5">
+                <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3">Build type</p>
+                <div className="bg-track rounded-lg p-1 flex gap-1">
                   {availableSystems.map(system => (
                     <button
                       key={system.id}
                       onClick={() => handleSystemChange(system.id)}
-                      className={`flex-1 py-3 px-4 rounded-lg font-medium text-sm transition-all ${
+                      className={`flex-1 py-2.5 px-4 rounded-md font-medium text-sm transition-all min-h-[44px] ${
                         selectedSystemId === system.id
-                          ? 'bg-orange-50 border-orange-500 text-orange-700 border'
-                          : 'bg-white border border-gray-200 hover:border-gray-300'
+                          ? 'bg-bone text-basalt shadow-sm'
+                          : 'text-stone hover:text-ink'
                       }`}
                     >
                       {system.name.replace('Floor ', '').replace('Wall ', '')}
@@ -996,9 +996,9 @@ export function Calculator() {
               </div>
 
               {/* Layers */}
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <p className="text-sm text-gray-500 mb-4">Layers</p>
-                <div className="space-y-3">
+              <div>
+                <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3 px-1">Layers</p>
+                <div className="space-y-4">
                   {renderStageGroups(singleStageGroups as [string, { layers: any[] }][])}
                 </div>
               </div>
@@ -1006,8 +1006,8 @@ export function Calculator() {
           )}
 
           {/* Colour picker */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <p className="text-sm text-gray-500 mb-3">Pigment colour</p>
+          <div className="bg-bone border border-line rounded-xl p-5">
+            <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3">Pigment colour</p>
             
             {/* Natural / No Pigment option - always visible */}
             <button
@@ -1015,20 +1015,20 @@ export function Calculator() {
                 setSelectedColour({ name: 'Natural (No Pigment)', hex: '#F5F5F0' })
                 setUseCustomColour(false)
               }}
-              className={`w-full mb-4 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+              className={`w-full mb-4 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all flex items-center justify-center gap-2 min-h-[44px] ${
                 selectedColour.name.toLowerCase().includes('natural') && !useCustomColour
-                  ? 'border-gray-900 bg-gray-50'
-                  : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-basalt bg-limestone'
+                  : 'border-line hover:border-stone'
               }`}
             >
-              <div className="w-5 h-5 rounded border border-gray-300" style={{ backgroundColor: '#F5F5F0' }} />
+              <div className="w-5 h-5 rounded border border-stone" style={{ backgroundColor: '#F5F5F0' }} />
               Natural (No Pigment)
             </button>
             
             <div className="space-y-3">
               {coloursByFamily.map(({ family, shades }) => (
                 <div key={family.id}>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">{family.name}</p>
+                  <p className="text-xs text-ash uppercase tracking-wide mb-2">{family.name}</p>
                   <div className="flex flex-wrap gap-2">
                     {shades.map(swatch => (
                       <button
@@ -1037,9 +1037,9 @@ export function Calculator() {
                           setSelectedColour({ name: swatch.name, hex: swatch.hex_code })
                           setUseCustomColour(false)
                         }}
-                        className={`w-8 h-8 rounded-lg border-2 transition-all ${
+                        className={`w-11 h-11 sm:w-9 sm:h-9 rounded-lg border-2 transition-all ${
                           selectedColour.name === swatch.name && !useCustomColour
-                            ? 'border-gray-900 scale-110 shadow-lg'
+                            ? 'border-basalt scale-110'
                             : 'border-transparent hover:scale-105'
                         }`}
                         style={{ backgroundColor: swatch.hex_code }}
@@ -1052,15 +1052,15 @@ export function Calculator() {
             </div>
             
             {/* Custom colour section */}
-            <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className="mt-4 pt-4 border-t border-line-soft">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs text-gray-400 uppercase tracking-wide">Custom Colour</p>
+                <p className="text-xs font-medium text-stone uppercase tracking-wide">Custom Colour</p>
                 <button
                   onClick={() => setUseCustomColour(!useCustomColour)}
                   className={`text-xs px-2 py-1 rounded ${
                     useCustomColour 
-                      ? 'bg-orange-100 text-orange-700' 
-                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      ? 'bg-basalt text-bone' 
+                      : 'bg-line-soft text-stone hover:bg-line'
                   }`}
                 >
                   {useCustomColour ? 'Using Custom' : 'Use Custom'}
@@ -1074,7 +1074,7 @@ export function Calculator() {
                       placeholder="Colour name (e.g. Farrow & Ball Hague Blue)"
                       value={customColourName}
                       onChange={e => setCustomColourName(e.target.value)}
-                      className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg"
+                      className="flex-1 px-3 py-2 text-sm border border-line rounded-lg"
                     />
                   </div>
                   <div className="flex gap-2">
@@ -1083,7 +1083,7 @@ export function Calculator() {
                       placeholder="#000000"
                       value={customColourHex}
                       onChange={e => setCustomColourHex(e.target.value)}
-                      className="w-24 px-3 py-2 text-sm border border-gray-200 rounded-lg font-mono"
+                      className="w-24 px-3 py-2 text-sm border border-line rounded-lg font-mono"
                     />
                     <input
                       type="color"
@@ -1091,7 +1091,7 @@ export function Calculator() {
                       onChange={e => setCustomColourHex(e.target.value)}
                       className="w-10 h-10 rounded cursor-pointer border-0"
                     />
-                    <span className="flex-1 text-xs text-gray-400 self-center">
+                    <span className="flex-1 text-xs text-ash self-center">
                       Pick or enter hex code
                     </span>
                   </div>
@@ -1100,9 +1100,9 @@ export function Calculator() {
             </div>
             
             {/* Selected colour display */}
-            <div className="flex items-center gap-3 mt-4 p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center gap-3 mt-4 p-3 bg-limestone rounded-lg">
               <div 
-                className="w-8 h-8 rounded-lg border border-gray-200"
+                className="w-8 h-8 rounded-lg border border-line"
                 style={{ backgroundColor: useCustomColour ? (customColourHex || '#888888') : selectedColour.hex }}
               />
               <span className="font-medium">
@@ -1113,13 +1113,13 @@ export function Calculator() {
         </div>
 
         {/* Results */}
-        <div className="lg:sticky lg:top-6 h-fit">
-          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        <div id="materials-section" className="lg:sticky lg:top-6 h-fit">
+          <div className="bg-bone border border-line rounded-xl p-5 shadow-sm">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="font-semibold text-gray-900">Materials</h2>
+              <h2 className="font-medium text-basalt">Materials</h2>
               <button
                 onClick={copyList}
-                className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-magma"
+                className="flex items-center gap-1.5 text-sm text-stone hover:text-molten-ink"
               >
                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                 {copied ? 'Copied!' : 'Copy'}
@@ -1127,21 +1127,21 @@ export function Calculator() {
             </div>
 
             {items.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-8">
+              <p className="text-ash text-sm text-center py-8">
                 Configure your layers to see materials
               </p>
             ) : (
               <>
                 <div className="space-y-1 mb-4">
                   {items.map((item, idx) => (
-                    <div key={idx} className="flex justify-between py-2 border-b border-gray-100 last:border-0">
+                    <div key={idx} className="flex justify-between py-2 border-b border-line-soft last:border-0">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{item.name}</p>
-                        <p className="text-xs text-gray-500">{item.qty}</p>
+                        <p className="text-sm font-medium text-basalt">{item.name}</p>
+                        <p className="text-xs text-stone">{item.qty}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-medium">£{formatCurrency(item.cost)}</p>
-                        <p className="text-xs text-gray-500">{item.units} × {item.unitSize}</p>
+                        <p className="text-xs text-stone">{item.units} × {item.unitSize}</p>
                       </div>
                     </div>
                   ))}
@@ -1149,44 +1149,46 @@ export function Calculator() {
 
                 {/* Legend for shared materials */}
                 {surface === 'both' && items.some(item => item.name.includes('✦')) && (
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 mb-4">
-                    <p className="text-xs text-purple-700">
-                      <span className="font-semibold">✦ Smart calculation:</span> These materials are calculated once for the combined floor + wall area — no need to buy separately for each surface.
+                  <div className="bg-molten-tint border border-molten/20 rounded-lg px-3 py-2 mb-4">
+                    <p className="text-xs text-molten-ink">
+                      <span className="font-medium">✦ Smart calculation:</span> These materials are calculated once for the combined floor + wall area — no need to buy separately for each surface.
                     </p>
                   </div>
                 )}
 
-                <div className="border-t-2 border-gray-200 pt-4 space-y-2">
+                <div className="border-t-2 border-line pt-4 space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Subtotal</span>
+                    <span className="text-stone">Subtotal</span>
                     <span className="font-medium">£{formatCurrency(subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">VAT (20%)</span>
+                    <span className="text-stone">VAT (20%)</span>
                     <span className="font-medium">£{formatCurrency(vat)}</span>
                   </div>
-                  <div className="flex justify-between text-xl font-bold pt-2">
-                    <span>Total</span>
-                    <span className="text-magma">£{formatCurrency(total)}</span>
+                  <div className="flex justify-between items-baseline pt-3">
+                    <span className="text-lg text-basalt">Total</span>
+                    <span className="text-3xl font-medium text-basalt total-accent">£{formatCurrency(total)}</span>
                   </div>
                 </div>
 
-                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Cost per m²</span>
-                    <span className="font-semibold">£{formatCurrency(costPerM2)}</span>
-                  </div>
+                <div className="flex justify-between text-sm mt-4">
+                  <span className="text-stone">Cost per m²</span>
+                  <span className="font-medium text-ink">£{formatCurrency(costPerM2)}</span>
                 </div>
 
-                <p className="text-xs text-gray-400 mt-4">
+                <p className="text-xs text-ash mt-4">
                   * Includes {wastagePercent}% wastage
+                </p>
+                
+                <p className="text-xs text-stone mt-3">
+                  Pallet / Delivery Costs: TBC — quoted at time of order
                 </p>
               </>
             )}
           </div>
 
           <Button 
-            className="w-full mt-4" 
+            className="w-full mt-4 hidden lg:flex" 
             size="lg"
             disabled={items.length === 0}
             onClick={() => setShowSaveModal(true)}
@@ -1196,7 +1198,37 @@ export function Calculator() {
         </div>
       </div>
 
-      <p className="text-center text-xs text-gray-400 mt-8">© Magma Coatings Ltd</p>
+      {/* Mobile sticky bottom bar - positioned above the tab nav */}
+      <div className="fixed bottom-16 left-0 right-0 bg-bone border-t border-line shadow-lg lg:hidden z-50">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-stone text-sm">Total</span>
+            <span className="text-xl font-medium text-basalt total-accent">£{formatCurrency(total)}</span>
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline"
+              className="flex-1 min-h-[48px]"
+              onClick={() => {
+                const el = document.getElementById('materials-section')
+                el?.scrollIntoView({ behavior: 'smooth' })
+              }}
+            >
+              <ChevronUp className="w-4 h-4 mr-1" />
+              Materials ({items.length})
+            </Button>
+            <Button 
+              className="flex-1 min-h-[48px]"
+              disabled={items.length === 0}
+              onClick={() => setShowSaveModal(true)}
+            >
+              Save Quote
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <p className="text-center text-xs text-ash mt-8 hidden lg:block">© Magma Coatings Ltd</p>
       
       {/* Save Quote Modal */}
       <SaveQuoteModal
