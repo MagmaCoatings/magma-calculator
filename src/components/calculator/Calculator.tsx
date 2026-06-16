@@ -1037,10 +1037,10 @@ export function Calculator() {
                           setSelectedColour({ name: swatch.name, hex: swatch.hex_code })
                           setUseCustomColour(false)
                         }}
-                        className={`w-11 h-11 sm:w-9 sm:h-9 rounded-lg border-2 transition-all ${
+                        className={`w-12 h-12 rounded-lg border transition-all ${
                           selectedColour.name === swatch.name && !useCustomColour
-                            ? 'border-basalt scale-110'
-                            : 'border-transparent hover:scale-105'
+                            ? 'ring-2 ring-basalt ring-offset-2 ring-offset-bone border-transparent'
+                            : 'border-line hover:border-stone'
                         }`}
                         style={{ backgroundColor: swatch.hex_code }}
                         title={swatch.name}
@@ -1198,8 +1198,8 @@ export function Calculator() {
         </div>
       </div>
 
-      {/* Mobile sticky bottom bar - positioned above the tab nav */}
-      <div className="fixed bottom-16 left-0 right-0 bg-bone border-t border-line shadow-lg lg:hidden z-50">
+      {/* Mobile sticky bottom bar - positioned above the tab nav (incl. iOS safe area) */}
+      <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 bg-bone border-t border-line shadow-lg lg:hidden z-50">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-stone text-sm">Total</span>

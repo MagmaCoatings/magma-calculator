@@ -11,10 +11,10 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-limestone">
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-magma border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-500">Loading...</p>
+          <p className="text-stone">Loading...</p>
         </div>
       </div>
     )
@@ -26,15 +26,15 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
 
   if (profile?.status === 'suspended') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-limestone px-4">
         <div className="text-center max-w-md">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Account Suspended</h1>
-          <p className="text-gray-500 mb-4">
+          <h1 className="text-2xl font-bold text-basalt mb-2">Account Suspended</h1>
+          <p className="text-stone mb-4">
             Your account has been suspended. Please contact Magma Coatings for assistance.
           </p>
           <a
             href="mailto:info@magmacoatings.com"
-            className="text-magma hover:underline"
+            className="text-molten-ink hover:underline"
           >
             info@magmacoatings.com
           </a>

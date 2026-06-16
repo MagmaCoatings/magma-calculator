@@ -673,7 +673,7 @@ export function SystemsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <div className="w-8 h-8 border-4 border-magma border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-molten border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -700,19 +700,19 @@ export function SystemsPage() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         <button
           onClick={() => { setView('list'); setSelectedSystem(null); setSystemProducts([]); setFinishPresets([]) }}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+          className="flex items-center gap-2 text-ink hover:text-basalt mb-6"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Systems
         </button>
 
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
-            <Layers className="w-6 h-6 text-orange-600" />
+          <div className="w-12 h-12 bg-molten-tint rounded-xl flex items-center justify-center">
+            <Layers className="w-6 h-6 text-molten-ink" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">{selectedSystem.name}</h1>
+            <h1 className="text-xl font-bold text-basalt">{selectedSystem.name}</h1>
             {selectedSystem.description && (
-              <p className="text-gray-500 text-sm">{selectedSystem.description}</p>
+              <p className="text-stone text-sm">{selectedSystem.description}</p>
             )}
           </div>
         </div>
@@ -723,7 +723,7 @@ export function SystemsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-lg">Microcement finish</CardTitle>
-                <p className="text-sm text-gray-600 mt-1">User picks one of these build-ups</p>
+                <p className="text-sm text-ink mt-1">User picks one of these build-ups</p>
               </div>
               <Button onClick={openNewPreset}>
                 <Plus className="w-4 h-4 mr-2" /> Add preset
@@ -732,7 +732,7 @@ export function SystemsPage() {
           </CardHeader>
           <CardContent className="p-4">
             {finishPresets.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-stone">
                 No finish presets yet. Add your first preset.
               </div>
             ) : (
@@ -742,27 +742,27 @@ export function SystemsPage() {
                     <div
                       key={preset.id}
                       className={`p-4 rounded-xl border-2 cursor-pointer hover:shadow-md transition-shadow ${
-                        preset.is_default ? 'border-orange-400 bg-orange-50/50' : 'border-gray-200 bg-white hover:border-gray-300'
+                        preset.is_default ? 'border-orange-400 bg-molten-tint/50' : 'border-line bg-bone hover:border-stone'
                       }`}
                       onClick={() => openEditPreset(preset)}
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-gray-900">{preset.name}</span>
+                            <span className="font-medium text-basalt">{preset.name}</span>
                             {preset.is_default && (
-                              <span className="px-2 py-0.5 bg-orange-500 text-white text-xs rounded-full">Default</span>
+                              <span className="px-2 py-0.5 bg-molten text-white text-xs rounded-full">Default</span>
                             )}
                           </div>
                           {preset.description && (
-                            <p className="text-sm text-gray-500 mt-0.5">{preset.description}</p>
+                            <p className="text-sm text-stone mt-0.5">{preset.description}</p>
                           )}
                         </div>
                         <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                           {!preset.is_default && (
                             <button
                               onClick={() => setPresetAsDefault(preset)}
-                              className="p-1.5 text-gray-400 hover:text-green-600 rounded hover:bg-green-50"
+                              className="p-1.5 text-ash hover:text-sage rounded hover:bg-sage-tint"
                               title="Set as default"
                             >
                               <Check className="w-4 h-4" />
@@ -770,7 +770,7 @@ export function SystemsPage() {
                           )}
                           <button
                             onClick={() => deletePreset(preset)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50"
+                            className="p-1.5 text-ash hover:text-danger rounded hover:bg-danger-tint"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -779,13 +779,13 @@ export function SystemsPage() {
                       <div className="flex flex-wrap gap-2">
                         {preset.products?.map((pp, idx) => (
                           <div key={pp.id} className="flex items-center gap-1 text-sm">
-                            <span className="px-2 py-1 bg-gray-100 rounded font-medium">
+                            <span className="px-2 py-1 bg-line-soft rounded font-medium">
                               {pp.product?.name?.replace('Magma ', '')}
                             </span>
-                            <span className="text-gray-400">×{pp.default_coats}</span>
-                            {pp.has_pigment && <Droplet className="w-3 h-3 text-blue-500" />}
+                            <span className="text-ash">×{pp.default_coats}</span>
+                            {pp.has_pigment && <Droplet className="w-3 h-3 text-molten-ink" />}
                             {idx < (preset.products?.length || 0) - 1 && (
-                              <span className="text-gray-300 mx-1">→</span>
+                              <span className="text-ash mx-1">→</span>
                             )}
                           </div>
                         ))}
@@ -810,7 +810,7 @@ export function SystemsPage() {
           </CardHeader>
           <CardContent className="p-0">
             {sortedGroups.length === 0 ? (
-              <div className="p-6 text-center text-gray-500">
+              <div className="p-6 text-center text-stone">
                 No other stages configured.
               </div>
             ) : (
@@ -819,13 +819,13 @@ export function SystemsPage() {
                   <div key={key} className="p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-700">{group.stage}</span>
+                        <span className="font-medium text-ink">{group.stage}</span>
                         {group.is_optional && (
                           <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">optional</span>
                         )}
                       </div>
                       {group.products.length > 1 && (
-                        <span className="text-xs text-gray-400">pick one</span>
+                        <span className="text-xs text-ash">pick one</span>
                       )}
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -835,22 +835,22 @@ export function SystemsPage() {
                           onClick={() => openProductEdit(sp)}
                           className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
                             sp.is_default_option
-                              ? 'bg-gray-700 text-white border-gray-700 hover:bg-gray-600'
-                              : 'bg-white border-gray-200 hover:border-blue-400'
+                              ? 'bg-basalt text-white border-basalt hover:bg-ink'
+                              : 'bg-bone border-line hover:border-blue-400'
                           }`}
                         >
-                          <span className={sp.is_default_option ? 'text-white' : 'text-gray-900'}>
+                          <span className={sp.is_default_option ? 'text-white' : 'text-basalt'}>
                             {sp.product?.name?.replace('DPM Epoxy Primer ', '').replace('Fibreglass ', '').replace('PU Seal ', '')}
                           </span>
                           {sp.has_pigment && (
-                            <Droplet className={`w-3 h-3 ${sp.is_default_option ? 'text-blue-300' : 'text-blue-500'}`} />
+                            <Droplet className={`w-3 h-3 ${sp.is_default_option ? 'text-ash' : 'text-molten-ink'}`} />
                           )}
                           {(sp.max_coats || 1) > 1 && (
-                            <span className={`text-xs ${sp.is_default_option ? 'text-gray-300' : 'text-gray-400'}`}>
+                            <span className={`text-xs ${sp.is_default_option ? 'text-ash' : 'text-ash'}`}>
                               {sp.min_coats || 1}-{sp.max_coats || 1}
                             </span>
                           )}
-                          <Pencil className={`w-3 h-3 ${sp.is_default_option ? 'text-gray-400' : 'text-gray-300'}`} />
+                          <Pencil className={`w-3 h-3 ${sp.is_default_option ? 'text-ash' : 'text-ash'}`} />
                         </div>
                       ))}
                     </div>
@@ -864,12 +864,12 @@ export function SystemsPage() {
         {/* PRODUCT EDIT MODAL */}
         {showProductModal && (editingProduct || isAddingProduct) && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-auto">
-              <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white">
-                <h2 className="text-lg font-semibold">
+            <div className="bg-bone rounded-2xl w-full max-w-md max-h-[90vh] overflow-auto">
+              <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-bone">
+                <h2 className="text-lg font-medium">
                   {isAddingProduct ? 'Add product to system' : `Edit: ${editingProduct?.product?.name}`}
                 </h2>
-                <button onClick={closeProductModal} className="p-2 hover:bg-gray-100 rounded-lg">
+                <button onClick={closeProductModal} className="p-2 hover:bg-line-soft rounded-lg">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -879,11 +879,11 @@ export function SystemsPage() {
                 {isAddingProduct && (
                   <>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
+                      <label className="block text-sm font-medium text-ink mb-1">Product</label>
                       <select
                         value={newProductId}
                         onChange={e => setNewProductId(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                        className="w-full px-3 py-2 border border-line rounded-lg"
                       >
                         {products.map(p => (
                           <option key={p.id} value={p.id}>{p.name}</option>
@@ -895,7 +895,7 @@ export function SystemsPage() {
                 
                 {/* Stage selection (always show - for both add and edit) */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Stage / Section</label>
+                  <label className="block text-sm font-medium text-ink mb-1">Stage / Section</label>
                   <div className="flex gap-2">
                     <select
                       value={isAddingProduct ? newProductStageId : (editingProduct?.stage_id || '')}
@@ -913,7 +913,7 @@ export function SystemsPage() {
                             })
                         }
                       }}
-                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg"
+                      className="flex-1 px-3 py-2 border border-line rounded-lg"
                     >
                       {stages.map(s => (
                         <option key={s.id} value={s.id}>{s.name}</option>
@@ -922,7 +922,7 @@ export function SystemsPage() {
                     <button
                       type="button"
                       onClick={() => setShowNewStageModal(true)}
-                      className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700"
+                      className="px-3 py-2 bg-line-soft hover:bg-track rounded-lg text-sm font-medium text-ink"
                     >
                       + New
                     </button>
@@ -939,61 +939,61 @@ export function SystemsPage() {
                         closeProductModal()
                       }
                     }}
-                    className="w-full py-2 px-4 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium"
+                    className="w-full py-2 px-4 bg-danger-tint text-danger rounded-lg hover:bg-danger-tint font-medium"
                   >
                     Remove from system
                   </button>
                 )}
                 
                 {/* Optional toggle */}
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between p-3 bg-limestone rounded-lg">
                   <div>
-                    <p className="font-medium text-gray-900">Optional layer</p>
-                    <p className="text-sm text-gray-500">User can toggle this on/off</p>
+                    <p className="font-medium text-basalt">Optional layer</p>
+                    <p className="text-sm text-stone">User can toggle this on/off</p>
                   </div>
                   <button
                     onClick={() => setProductForm({ ...productForm, is_optional: !productForm.is_optional })}
                     className={`w-14 h-7 rounded-full transition-colors relative ${
-                      productForm.is_optional ? 'bg-green-500' : 'bg-gray-300'
+                      productForm.is_optional ? 'bg-sage' : 'bg-ash'
                     }`}
                   >
-                    <div className={`w-6 h-6 rounded-full bg-white shadow absolute top-0.5 transition-transform ${
+                    <div className={`w-6 h-6 rounded-full bg-bone shadow absolute top-0.5 transition-transform ${
                       productForm.is_optional ? 'translate-x-7' : 'translate-x-0.5'
                     }`} />
                   </button>
                 </div>
 
                 {/* Default option toggle */}
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between p-3 bg-limestone rounded-lg">
                   <div>
-                    <p className="font-medium text-gray-900">Default selection</p>
-                    <p className="text-sm text-gray-500">Pre-selected in option groups</p>
+                    <p className="font-medium text-basalt">Default selection</p>
+                    <p className="text-sm text-stone">Pre-selected in option groups</p>
                   </div>
                   <button
                     onClick={() => setProductForm({ ...productForm, is_default_option: !productForm.is_default_option })}
                     className={`w-14 h-7 rounded-full transition-colors relative ${
-                      productForm.is_default_option ? 'bg-amber-500' : 'bg-gray-300'
+                      productForm.is_default_option ? 'bg-amber-500' : 'bg-ash'
                     }`}
                   >
-                    <div className={`w-6 h-6 rounded-full bg-white shadow absolute top-0.5 transition-transform ${
+                    <div className={`w-6 h-6 rounded-full bg-bone shadow absolute top-0.5 transition-transform ${
                       productForm.is_default_option ? 'translate-x-7' : 'translate-x-0.5'
                     }`} />
                   </button>
                 </div>
 
                 {/* Pigment toggle */}
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between p-3 bg-limestone rounded-lg">
                   <div>
-                    <p className="font-medium text-gray-900">Has pigment</p>
-                    <p className="text-sm text-gray-500">Show pigment toggle in calculator</p>
+                    <p className="font-medium text-basalt">Has pigment</p>
+                    <p className="text-sm text-stone">Show pigment toggle in calculator</p>
                   </div>
                   <button
                     onClick={() => setProductForm({ ...productForm, has_pigment: !productForm.has_pigment })}
                     className={`w-14 h-7 rounded-full transition-colors relative ${
-                      productForm.has_pigment ? 'bg-blue-500' : 'bg-gray-300'
+                      productForm.has_pigment ? 'bg-molten-tint0' : 'bg-ash'
                     }`}
                   >
-                    <div className={`w-6 h-6 rounded-full bg-white shadow absolute top-0.5 transition-transform ${
+                    <div className={`w-6 h-6 rounded-full bg-bone shadow absolute top-0.5 transition-transform ${
                       productForm.has_pigment ? 'translate-x-7' : 'translate-x-0.5'
                     }`} />
                   </button>
@@ -1001,18 +1001,18 @@ export function SystemsPage() {
 
                 {/* Pigment default ON/OFF (only show when has_pigment is true) */}
                 {productForm.has_pigment && (
-                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg ml-4">
+                  <div className="flex items-center justify-between p-3 bg-molten-tint rounded-lg ml-4">
                     <div>
-                      <p className="font-medium text-gray-900">Pigment default ON</p>
-                      <p className="text-sm text-gray-500">Toggle starts in ON position</p>
+                      <p className="font-medium text-basalt">Pigment default ON</p>
+                      <p className="text-sm text-stone">Toggle starts in ON position</p>
                     </div>
                     <button
                       onClick={() => setProductForm({ ...productForm, pigment_default_on: !productForm.pigment_default_on })}
                       className={`w-14 h-7 rounded-full transition-colors relative ${
-                        productForm.pigment_default_on ? 'bg-green-500' : 'bg-gray-300'
+                        productForm.pigment_default_on ? 'bg-sage' : 'bg-ash'
                       }`}
                     >
-                      <div className={`w-6 h-6 rounded-full bg-white shadow absolute top-0.5 transition-transform ${
+                      <div className={`w-6 h-6 rounded-full bg-bone shadow absolute top-0.5 transition-transform ${
                         productForm.pigment_default_on ? 'translate-x-7' : 'translate-x-0.5'
                       }`} />
                     </button>
@@ -1020,18 +1020,18 @@ export function SystemsPage() {
                 )}
 
                 {/* Shared across surfaces toggle */}
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between p-3 bg-limestone rounded-lg">
                   <div>
-                    <p className="font-medium text-gray-900">Shared across surfaces</p>
-                    <p className="text-sm text-gray-500">In Floor+Wall mode, calculate for combined area</p>
+                    <p className="font-medium text-basalt">Shared across surfaces</p>
+                    <p className="text-sm text-stone">In Floor+Wall mode, calculate for combined area</p>
                   </div>
                   <button
                     onClick={() => setProductForm({ ...productForm, shared_across_surfaces: !productForm.shared_across_surfaces })}
                     className={`w-14 h-7 rounded-full transition-colors relative ${
-                      productForm.shared_across_surfaces ? 'bg-purple-500' : 'bg-gray-300'
+                      productForm.shared_across_surfaces ? 'bg-sage' : 'bg-ash'
                     }`}
                   >
-                    <div className={`w-6 h-6 rounded-full bg-white shadow absolute top-0.5 transition-transform ${
+                    <div className={`w-6 h-6 rounded-full bg-bone shadow absolute top-0.5 transition-transform ${
                       productForm.shared_across_surfaces ? 'translate-x-7' : 'translate-x-0.5'
                     }`} />
                   </button>
@@ -1040,11 +1040,11 @@ export function SystemsPage() {
                 {/* Coats range */}
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Default</label>
+                    <label className="block text-sm font-medium text-ink mb-1">Default</label>
                     <select
                       value={productForm.default_coats}
                       onChange={e => setProductForm({ ...productForm, default_coats: parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                      className="w-full px-3 py-2 border border-line rounded-lg"
                     >
                       {[1, 2, 3, 4].map(n => (
                         <option key={n} value={n}>{n}</option>
@@ -1052,11 +1052,11 @@ export function SystemsPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Min</label>
+                    <label className="block text-sm font-medium text-ink mb-1">Min</label>
                     <select
                       value={productForm.min_coats}
                       onChange={e => setProductForm({ ...productForm, min_coats: parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                      className="w-full px-3 py-2 border border-line rounded-lg"
                     >
                       {[1, 2, 3, 4].map(n => (
                         <option key={n} value={n}>{n}</option>
@@ -1064,11 +1064,11 @@ export function SystemsPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Max</label>
+                    <label className="block text-sm font-medium text-ink mb-1">Max</label>
                     <select
                       value={productForm.max_coats}
                       onChange={e => setProductForm({ ...productForm, max_coats: parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                      className="w-full px-3 py-2 border border-line rounded-lg"
                     >
                       {[1, 2, 3, 4].map(n => (
                         <option key={n} value={n}>{n}</option>
@@ -1079,7 +1079,7 @@ export function SystemsPage() {
 
                 {/* Coverage */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Coverage (m² per pack)</label>
+                  <label className="block text-sm font-medium text-ink mb-1">Coverage (m² per pack)</label>
                   <Input
                     type="number"
                     value={productForm.coverage_sqm || ''}
@@ -1090,7 +1090,7 @@ export function SystemsPage() {
 
                 {/* Coverage note */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Coverage note</label>
+                  <label className="block text-sm font-medium text-ink mb-1">Coverage note</label>
                   <Input
                     value={productForm.coverage_note}
                     onChange={e => setProductForm({ ...productForm, coverage_note: e.target.value })}
@@ -1100,7 +1100,7 @@ export function SystemsPage() {
 
                 {/* Option group */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Option group</label>
+                  <label className="block text-sm font-medium text-ink mb-1">Option group</label>
                   {(() => {
                     // Get existing option groups from current system's products
                     const existingGroups = [...new Set(
@@ -1124,7 +1124,7 @@ export function SystemsPage() {
                               setProductForm({ ...productForm, option_group: e.target.value })
                             }
                           }}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                          className="w-full px-3 py-2 border border-line rounded-lg bg-bone"
                         >
                           <option value="">No group (standalone)</option>
                           {existingGroups.map(group => (
@@ -1152,16 +1152,16 @@ export function SystemsPage() {
                       </div>
                     )
                   })()}
-                  <p className="text-xs text-gray-500 mt-1">Products with the same group become OR choices</p>
+                  <p className="text-xs text-stone mt-1">Products with the same group become OR choices</p>
                 </div>
 
                 {/* Depends on (conditional visibility) */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Only show when selected</label>
+                  <label className="block text-sm font-medium text-ink mb-1">Only show when selected</label>
                   <select
                     value={productForm.depends_on_product_id || ''}
                     onChange={e => setProductForm({ ...productForm, depends_on_product_id: e.target.value || null })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                    className="w-full px-3 py-2 border border-line rounded-lg"
                   >
                     <option value="">Always show (no dependency)</option>
                     {systemProducts
@@ -1172,11 +1172,11 @@ export function SystemsPage() {
                         </option>
                       ))}
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">This layer only appears when the selected product is chosen</p>
+                  <p className="text-xs text-stone mt-1">This layer only appears when the selected product is chosen</p>
                 </div>
               </div>
 
-              <div className="flex gap-3 p-4 border-t bg-gray-50 rounded-b-2xl">
+              <div className="flex gap-3 p-4 border-t bg-limestone rounded-b-2xl">
                 <Button variant="outline" className="flex-1" onClick={closeProductModal}>
                   Cancel
                 </Button>
@@ -1191,15 +1191,15 @@ export function SystemsPage() {
         {/* NEW STAGE MODAL */}
         {showNewStageModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-            <div className="bg-white rounded-2xl w-full max-w-sm">
+            <div className="bg-bone rounded-2xl w-full max-w-sm">
               <div className="flex items-center justify-between p-4 border-b">
-                <h2 className="text-lg font-semibold">Create new stage</h2>
-                <button onClick={() => setShowNewStageModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <h2 className="text-lg font-medium">Create new stage</h2>
+                <button onClick={() => setShowNewStageModal(false)} className="p-2 hover:bg-line-soft rounded-lg">
                   <X className="w-5 h-5" />
                 </button>
               </div>
               <div className="p-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Stage name</label>
+                <label className="block text-sm font-medium text-ink mb-1">Stage name</label>
                 <Input
                   value={newStageName}
                   onChange={e => setNewStageName(e.target.value)}
@@ -1210,7 +1210,7 @@ export function SystemsPage() {
                   }}
                 />
               </div>
-              <div className="flex gap-3 p-4 border-t bg-gray-50 rounded-b-2xl">
+              <div className="flex gap-3 p-4 border-t bg-limestone rounded-b-2xl">
                 <Button variant="outline" className="flex-1" onClick={() => setShowNewStageModal(false)}>
                   Cancel
                 </Button>
@@ -1225,12 +1225,12 @@ export function SystemsPage() {
         {/* PRESET MODAL */}
         {showPresetModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl w-full max-w-xl max-h-[90vh] overflow-auto">
-              <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white">
-                <h2 className="text-lg font-semibold">
+            <div className="bg-bone rounded-2xl w-full max-w-xl max-h-[90vh] overflow-auto">
+              <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-bone">
+                <h2 className="text-lg font-medium">
                   {editingPreset ? 'Edit preset' : 'Create preset'}
                 </h2>
-                <button onClick={closePresetModal} className="p-2 hover:bg-gray-100 rounded-lg">
+                <button onClick={closePresetModal} className="p-2 hover:bg-line-soft rounded-lg">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -1238,7 +1238,7 @@ export function SystemsPage() {
               <div className="p-4 space-y-4">
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Preset name</label>
+                    <label className="block text-sm font-medium text-ink mb-1">Preset name</label>
                     <Input
                       placeholder="e.g., Smooth finish"
                       value={presetForm.name}
@@ -1246,7 +1246,7 @@ export function SystemsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <label className="block text-sm font-medium text-ink mb-1">Description</label>
                     <Input
                       placeholder="Brief description"
                       value={presetForm.description}
@@ -1257,33 +1257,33 @@ export function SystemsPage() {
 
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <label className="text-sm font-medium text-gray-700">Build-up recipe</label>
+                    <label className="text-sm font-medium text-ink">Build-up recipe</label>
                     <Button size="sm" variant="outline" onClick={addPresetProduct}>
                       <Plus className="w-3 h-3 mr-1" /> Add layer
                     </Button>
                   </div>
                   
                   {presetProducts.length === 0 ? (
-                    <div className="text-center py-6 text-gray-400 border-2 border-dashed rounded-xl">
+                    <div className="text-center py-6 text-ash border-2 border-dashed rounded-xl">
                       Add microcement layers
                     </div>
                   ) : (
                     <div className="space-y-2">
                       {presetProducts.map((pp, idx) => {
                         return (
-                          <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
+                          <div key={idx} className="flex items-center gap-2 p-3 bg-limestone rounded-xl">
                             <div className="flex flex-col gap-1">
                               <button
                                 onClick={() => movePresetProduct(idx, 'up')}
                                 disabled={idx === 0}
-                                className="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                className="p-0.5 text-ash hover:text-ink disabled:opacity-30"
                               >
                                 <ChevronUp className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => movePresetProduct(idx, 'down')}
                                 disabled={idx === presetProducts.length - 1}
-                                className="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                className="p-0.5 text-ash hover:text-ink disabled:opacity-30"
                               >
                                 <ChevronDown className="w-4 h-4" />
                               </button>
@@ -1291,7 +1291,7 @@ export function SystemsPage() {
                             <select
                               value={pp.product_id}
                               onChange={e => updatePresetProduct(idx, 'product_id', e.target.value)}
-                              className="flex-1 px-2 py-1.5 border border-gray-200 rounded-lg text-sm"
+                              className="flex-1 px-2 py-1.5 border border-line rounded-lg text-sm"
                             >
                               {microProducts.map(mp => (
                                 <option key={mp.id} value={mp.id}>{mp.name.replace('Magma ', '')}</option>
@@ -1300,18 +1300,18 @@ export function SystemsPage() {
                             <button
                               onClick={() => updatePresetProduct(idx, 'has_pigment', !pp.has_pigment)}
                               className={`p-1.5 rounded transition-colors ${
-                                pp.has_pigment ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'
+                                pp.has_pigment ? 'bg-molten-tint text-molten-ink' : 'bg-line-soft text-ash'
                               }`}
                               title="Toggle pigment"
                             >
                               <Droplet className="w-4 h-4" />
                             </button>
                             <div className="flex items-center gap-1">
-                              <span className="text-xs text-gray-500">Default:</span>
+                              <span className="text-xs text-stone">Default:</span>
                               <select
                                 value={pp.default_coats}
                                 onChange={e => updatePresetProduct(idx, 'default_coats', parseInt(e.target.value))}
-                                className="w-14 px-1 py-1 border border-gray-200 rounded text-sm"
+                                className="w-14 px-1 py-1 border border-line rounded text-sm"
                               >
                                 {[1, 2, 3].map(n => (
                                   <option key={n} value={n}>{n}</option>
@@ -1319,21 +1319,21 @@ export function SystemsPage() {
                               </select>
                             </div>
                             <div className="flex items-center gap-1">
-                              <span className="text-xs text-gray-500">Range:</span>
+                              <span className="text-xs text-stone">Range:</span>
                               <select
                                 value={pp.min_coats}
                                 onChange={e => updatePresetProduct(idx, 'min_coats', parseInt(e.target.value))}
-                                className="w-12 px-1 py-1 border border-gray-200 rounded text-sm"
+                                className="w-12 px-1 py-1 border border-line rounded text-sm"
                               >
                                 {[1, 2, 3].map(n => (
                                   <option key={n} value={n}>{n}</option>
                                 ))}
                               </select>
-                              <span className="text-gray-400">-</span>
+                              <span className="text-ash">-</span>
                               <select
                                 value={pp.max_coats}
                                 onChange={e => updatePresetProduct(idx, 'max_coats', parseInt(e.target.value))}
-                                className="w-12 px-1 py-1 border border-gray-200 rounded text-sm"
+                                className="w-12 px-1 py-1 border border-line rounded text-sm"
                               >
                                 {[1, 2, 3].map(n => (
                                   <option key={n} value={n}>{n}</option>
@@ -1342,7 +1342,7 @@ export function SystemsPage() {
                             </div>
                             <button
                               onClick={() => removePresetProduct(idx)}
-                              className="p-1.5 text-gray-400 hover:text-red-600"
+                              className="p-1.5 text-ash hover:text-danger"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -1354,20 +1354,20 @@ export function SystemsPage() {
                 </div>
 
                 {presetProducts.length > 0 && (
-                  <div className="p-3 bg-blue-50 rounded-xl">
-                    <p className="text-xs text-blue-600 font-medium mb-2">Installer sees:</p>
+                  <div className="p-3 bg-molten-tint rounded-xl">
+                    <p className="text-xs text-molten-ink font-medium mb-2">Installer sees:</p>
                     <div className="flex flex-wrap items-center gap-2">
                       {presetProducts.map((pp, idx) => {
                         const prod = products.find(p => p.id === pp.product_id)
                         return (
                           <div key={idx} className="flex items-center gap-1">
-                            <span className="px-2 py-1 bg-white rounded text-sm font-medium">
+                            <span className="px-2 py-1 bg-bone rounded text-sm font-medium">
                               {prod?.name?.replace('Magma ', '')}
                             </span>
-                            <span className="text-gray-500 text-sm">×{pp.default_coats}</span>
-                            {pp.has_pigment && <Droplet className="w-3 h-3 text-blue-500" />}
+                            <span className="text-stone text-sm">×{pp.default_coats}</span>
+                            {pp.has_pigment && <Droplet className="w-3 h-3 text-molten-ink" />}
                             {idx < presetProducts.length - 1 && (
-                              <span className="text-gray-300 mx-1">→</span>
+                              <span className="text-ash mx-1">→</span>
                             )}
                           </div>
                         )
@@ -1377,7 +1377,7 @@ export function SystemsPage() {
                 )}
               </div>
 
-              <div className="flex gap-3 p-4 border-t bg-gray-50 rounded-b-2xl">
+              <div className="flex gap-3 p-4 border-t bg-limestone rounded-b-2xl">
                 <Button variant="outline" className="flex-1" onClick={closePresetModal}>
                   Cancel
                 </Button>
@@ -1397,8 +1397,8 @@ export function SystemsPage() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Systems</h1>
-          <p className="text-gray-500">Manage microcement build-up systems</p>
+          <h1 className="text-2xl font-bold text-basalt">Systems</h1>
+          <p className="text-stone">Manage microcement build-up systems</p>
         </div>
         <Button onClick={() => setShowAddSystem(true)}>
           <Plus className="w-4 h-4 mr-2" /> Add System
@@ -1422,7 +1422,7 @@ export function SystemsPage() {
               <select
                 value={newSystem.family}
                 onChange={e => setNewSystem({ ...newSystem, family: e.target.value })}
-                className="px-3 py-2 border border-gray-200 rounded-lg"
+                className="px-3 py-2 border border-line rounded-lg"
               >
                 {existingFamilies.map(fam => (
                   <option key={fam} value={fam}>{fam}</option>
@@ -1432,7 +1432,7 @@ export function SystemsPage() {
               <select
                 value={newSystem.surface_type}
                 onChange={e => setNewSystem({ ...newSystem, surface_type: e.target.value as any })}
-                className="px-3 py-2 border border-gray-200 rounded-lg"
+                className="px-3 py-2 border border-line rounded-lg"
               >
                 <option value="floor">Floor</option>
                 <option value="wall">Wall</option>
@@ -1472,13 +1472,13 @@ export function SystemsPage() {
                       value={editSystemName}
                       onChange={e => setEditSystemName(e.target.value)}
                       placeholder="System name"
-                      className="font-semibold"
+                      className="font-medium"
                       autoFocus
                     />
                     <select
                       value={editSystemFamily}
                       onChange={e => setEditSystemFamily(e.target.value)}
-                      className="px-3 py-2 border border-gray-200 rounded-lg"
+                      className="px-3 py-2 border border-line rounded-lg"
                     >
                       {existingFamilies.map(fam => (
                         <option key={fam} value={fam}>{fam}</option>
@@ -1511,8 +1511,8 @@ export function SystemsPage() {
               ) : deletingSystemId === system.id ? (
                 // Delete confirmation
                 <div className="space-y-3">
-                  <p className="text-red-600 font-medium">Delete "{system.name}"?</p>
-                  <p className="text-sm text-gray-500">This will remove the system and all its product configurations. This cannot be undone.</p>
+                  <p className="text-danger font-medium">Delete "{system.name}"?</p>
+                  <p className="text-sm text-stone">This will remove the system and all its product configurations. This cannot be undone.</p>
                   <div className="flex justify-end gap-2">
                     <Button variant="outline" size="sm" onClick={() => setDeletingSystemId(null)}>
                       Cancel
@@ -1527,57 +1527,53 @@ export function SystemsPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex-1 cursor-pointer" onClick={() => openSystem(system)}>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold text-gray-900">{system.name}</h3>
-                      <span className={`px-2 py-0.5 text-xs rounded ${
-                        system.surface_type === 'floor' ? 'bg-blue-100 text-blue-700' :
-                        system.surface_type === 'wall' ? 'bg-green-100 text-green-700' :
-                        'bg-purple-100 text-purple-700'
-                      }`}>
+                      <h3 className="font-medium text-basalt">{system.name}</h3>
+                      <span className="px-2 py-0.5 text-xs rounded bg-track text-stone capitalize">
                         {system.surface_type}
                       </span>
                       {system.family && (
-                        <span className="px-2 py-0.5 text-xs rounded bg-orange-100 text-orange-700">
+                        <span className="px-2 py-0.5 text-xs rounded bg-molten-tint text-molten-ink">
                           {system.family}
                         </span>
                       )}
                       {!system.is_active && (
-                        <span className="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-500">inactive</span>
+                        <span className="px-2 py-0.5 text-xs rounded bg-line-soft text-stone">inactive</span>
                       )}
                     </div>
                     {system.description && (
-                      <p className="text-sm text-gray-500 mt-1">{system.description}</p>
+                      <p className="text-sm text-stone mt-1">{system.description}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={e => startEditSystem(system, e)}
-                      className="p-2 hover:bg-gray-100 rounded-lg"
+                      className="p-2 hover:bg-line-soft rounded-lg"
                       title="Rename"
                     >
-                      <Pencil className="w-4 h-4 text-gray-400" />
+                      <Pencil className="w-4 h-4 text-ash" />
                     </button>
                     <button
                       onClick={e => { e.stopPropagation(); setDeletingSystemId(system.id) }}
-                      className="p-2 hover:bg-red-50 rounded-lg"
+                      className="p-2 hover:bg-danger-tint rounded-lg"
                       title="Delete"
                     >
-                      <Trash2 className="w-4 h-4 text-red-400" />
+                      <Trash2 className="w-4 h-4 text-danger" />
                     </button>
                     <button
                       onClick={e => { e.stopPropagation(); toggleSystemActive(system) }}
                       className={`px-3 py-1.5 text-xs font-medium rounded-lg ${
                         system.is_active
-                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          ? 'bg-sage-tint text-sage hover:bg-sage-tint'
+                          : 'bg-line-soft text-stone hover:bg-track'
                       }`}
                     >
                       {system.is_active ? 'Active' : 'Inactive'}
                     </button>
                     <button
                       onClick={() => openSystem(system)}
-                      className="p-2 hover:bg-gray-100 rounded-lg"
+                      className="p-2 hover:bg-line-soft rounded-lg"
                     >
-                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                      <ChevronRight className="w-5 h-5 text-ash" />
                     </button>
                   </div>
                 </div>

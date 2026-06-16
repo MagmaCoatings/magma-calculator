@@ -102,17 +102,17 @@ export function ActivityLogPage() {
 
   function getActionColor(action: string) {
     switch (action) {
-      case 'create': return 'bg-green-100 text-green-700'
-      case 'update': return 'bg-blue-100 text-blue-700'
-      case 'delete': return 'bg-red-100 text-red-700'
-      default: return 'bg-gray-100 text-gray-700'
+      case 'create': return 'bg-sage-tint text-sage'
+      case 'update': return 'bg-molten-tint text-molten-ink'
+      case 'delete': return 'bg-danger-tint text-danger'
+      default: return 'bg-line-soft text-ink'
     }
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <div className="w-8 h-8 border-4 border-magma border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-molten border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -124,25 +124,25 @@ export function ActivityLogPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Activity Log</h1>
-          <p className="text-gray-500 text-sm mt-1">Audit trail of all system changes</p>
+          <h1 className="text-2xl font-bold text-basalt">Activity Log</h1>
+          <p className="text-stone text-sm mt-1">Audit trail of all system changes</p>
         </div>
       </div>
 
       {/* Filters */}
       <div className="flex gap-4 mb-6">
         <div className="relative flex-1">
-          <Activity className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Activity className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ash" />
           <input
             type="text"
             placeholder="Search by name, user, or email..."
-            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200"
+            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-line bg-track text-base"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
         </div>
         <select
-          className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm"
+          className="px-3 py-2 rounded-lg border border-line bg-bone text-sm"
           value={actionFilter}
           onChange={e => setActionFilter(e.target.value)}
         >
@@ -152,7 +152,7 @@ export function ActivityLogPage() {
           ))}
         </select>
         <select
-          className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm"
+          className="px-3 py-2 rounded-lg border border-line bg-bone text-sm"
           value={entityFilter}
           onChange={e => setEntityFilter(e.target.value)}
         >
@@ -166,9 +166,9 @@ export function ActivityLogPage() {
       {/* Logs List */}
       {filteredLogs.length === 0 ? (
         <Card className="p-12 text-center">
-          <Activity className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No activity found</h3>
-          <p className="text-gray-500">Activity will appear here as users make changes</p>
+          <Activity className="w-12 h-12 text-ash mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-basalt mb-2">No activity found</h3>
+          <p className="text-stone">Activity will appear here as users make changes</p>
         </Card>
       ) : (
         <div className="space-y-2">
@@ -176,7 +176,7 @@ export function ActivityLogPage() {
             <Card key={log.id} className="p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
+                  <div className="w-8 h-8 rounded-full bg-line-soft flex items-center justify-center text-stone">
                     {getEntityIcon(log.entity_type)}
                   </div>
                   <div>
@@ -184,21 +184,21 @@ export function ActivityLogPage() {
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getActionColor(log.action)}`}>
                         {log.action}
                       </span>
-                      <span className="text-sm font-medium text-gray-900">
+                      <span className="text-sm font-medium text-basalt">
                         {log.entity_type}: {log.entity_name || log.entity_id || 'Unknown'}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-stone mt-1">
                       by {log.user_name || log.user_email || 'Unknown user'}
                     </p>
                   </div>
                 </div>
-                <div className="text-right text-xs text-gray-400">
+                <div className="text-right text-xs text-ash">
                   {formatDate(log.created_at)}
                 </div>
               </div>
               {log.details && Object.keys(log.details).length > 0 && (
-                <div className="mt-2 p-2 bg-gray-50 rounded text-xs text-gray-600 font-mono">
+                <div className="mt-2 p-2 bg-limestone rounded text-xs text-ink font-mono">
                   {JSON.stringify(log.details, null, 2)}
                 </div>
               )}
@@ -208,7 +208,7 @@ export function ActivityLogPage() {
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-4 border-t">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-stone">
                 Showing {startIndex + 1}-{Math.min(endIndex, filteredLogs.length)} of {filteredLogs.length} entries
               </p>
               <div className="flex items-center gap-2">
@@ -221,7 +221,7 @@ export function ActivityLogPage() {
                   <ChevronLeft className="w-4 h-4" />
                   Previous
                 </Button>
-                <span className="px-3 py-1 text-sm text-gray-600">
+                <span className="px-3 py-1 text-sm text-ink">
                   Page {currentPage} of {totalPages}
                 </span>
                 <Button

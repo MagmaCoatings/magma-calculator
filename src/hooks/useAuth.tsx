@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const ip = await getClientIP()
       const geo = ip ? await getGeoFromIP(ip) : {}
 
-      await supabase.from('login_logs').insert({
+      const { error } = await supabase.from('login_logs').insert({
         user_id: userId,
         ip_address: ip,
         city: geo.city,
@@ -75,6 +75,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         os: getOS(),
         is_suspicious: false,
       })
+      if (error) {
+        console.error('Login log insert failed:', error)
+        localStorage.removeItem(lockKey)
+      }
     } catch (error) {
       console.error('Error logging login:', error)
       // Clear lock on error so retry works

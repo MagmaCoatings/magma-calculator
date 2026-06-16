@@ -338,9 +338,19 @@ export function QuotePDF({
           </View>
         )}
 
+        {/* Delivery Note */}
+        <View style={{ marginTop: 15, padding: 10, backgroundColor: '#fef3c7', borderRadius: 4 }}>
+          <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#92400e' }}>
+            Pallet / Delivery Costs: TBC
+          </Text>
+          <Text style={{ fontSize: 8, color: '#b45309', marginTop: 2 }}>
+            Quoted at time of order
+          </Text>
+        </View>
+
         {/* Footer */}
         <Text style={styles.footer}>
-          Magma Coatings Ltd • Quote valid for 30 days • Prices exclude delivery
+          Magma Coatings Ltd • Quote valid for 30 days
         </Text>
       </Page>
     </Document>

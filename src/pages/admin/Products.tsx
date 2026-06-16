@@ -258,7 +258,7 @@ export function ProductsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <div className="w-8 h-8 border-4 border-magma border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-molten border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -266,11 +266,10 @@ export function ProductsPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Products</h1>
+        <h1 className="text-2xl font-bold text-basalt">Products</h1>
         <div className="flex gap-2">
           <Button
-            variant={groupByCategory ? 'default' : 'outline'}
-            size="sm"
+            variant="outline"
             onClick={() => setGroupByCategory(!groupByCategory)}
           >
             {groupByCategory ? 'Grouped' : 'Flat List'}
@@ -303,9 +302,9 @@ export function ProductsPage() {
                 onChange={e => setNewProduct({ ...newProduct, name: e.target.value })}
               />
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <label className="block text-sm font-medium text-ink mb-1">Category</label>
                 <select
-                  className="w-full h-10 px-3 rounded-lg border border-gray-200"
+                  className="w-full h-10 px-3 rounded-lg border border-line"
                   value={newProduct.category_id}
                   onChange={e => setNewProduct({ ...newProduct, category_id: e.target.value })}
                 >
@@ -332,9 +331,9 @@ export function ProductsPage() {
                   onChange={e => setNewProduct({ ...newProduct, pack_size: e.target.value })}
                 />
                 <div className="w-24">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                  <label className="block text-sm font-medium text-ink mb-1">Unit</label>
                   <select
-                    className="w-full h-10 px-3 rounded-lg border border-gray-200"
+                    className="w-full h-10 px-3 rounded-lg border border-line"
                     value={newProduct.pack_unit}
                     onChange={e => setNewProduct({ ...newProduct, pack_unit: e.target.value })}
                   >
@@ -364,11 +363,11 @@ export function ProductsPage() {
 
       {/* Search */}
       <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ash" />
         <input
           type="text"
           placeholder="Search products..."
-          className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200"
+          className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-line bg-track text-base"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -378,24 +377,24 @@ export function ProductsPage() {
       {groupedProducts.map(group => (
         <div key={group.category?.id || 'uncategorized'} className="mb-6">
           {group.category && (
-            <h2 className="text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <span className="w-1 h-6 bg-magma rounded"></span>
+            <h2 className="text-lg font-medium text-ink mb-3 flex items-center gap-2">
+              <span className="w-1 h-6 bg-molten rounded"></span>
               {group.category.name}
-              <span className="text-sm font-normal text-gray-400">({group.products.length})</span>
+              <span className="text-sm font-normal text-ash">({group.products.length})</span>
             </h2>
           )}
           <Card>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-100">
+                <thead className="bg-track border-b border-line">
                   <tr>
-                    <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-10"></th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pack</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    <th className="px-2 py-3 text-left text-xs font-medium text-stone uppercase w-10"></th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-stone uppercase">Code</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-stone uppercase">Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-stone uppercase">Pack</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-stone uppercase">Price</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-stone uppercase">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-stone uppercase">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -403,9 +402,9 @@ export function ProductsPage() {
                     <React.Fragment key={product.id}>
                     <tr className={`transition-colors ${
                       savedId === product.id 
-                        ? 'bg-green-50' 
+                        ? 'bg-sage-tint' 
                         : !product.is_active 
-                          ? 'bg-gray-50 opacity-60' 
+                          ? 'bg-limestone opacity-60' 
                           : ''
                     }`}>
                       {/* Reorder buttons */}
@@ -414,14 +413,14 @@ export function ProductsPage() {
                           <button
                             onClick={() => moveProduct(product.id, 'up')}
                             disabled={index === 0}
-                            className="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                            className="p-0.5 text-ash hover:text-ink disabled:opacity-30"
                           >
                             <ChevronUp className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => moveProduct(product.id, 'down')}
                             disabled={index === group.products.length - 1}
-                            className="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                            className="p-0.5 text-ash hover:text-ink disabled:opacity-30"
                           >
                             <ChevronDown className="w-4 h-4" />
                           </button>
@@ -434,7 +433,7 @@ export function ProductsPage() {
                           <td className="px-4 py-3">
                             <input
                               type="text"
-                              className="w-full px-2 py-1 rounded border border-gray-300 text-sm font-mono"
+                              className="w-full px-2 py-1 rounded border border-stone text-sm font-mono"
                               value={editForm.code}
                               onChange={e => setEditForm({ ...editForm, code: e.target.value })}
                             />
@@ -442,7 +441,7 @@ export function ProductsPage() {
                           <td className="px-4 py-3">
                             <input
                               type="text"
-                              className="w-full px-2 py-1 rounded border border-gray-300 text-sm"
+                              className="w-full px-2 py-1 rounded border border-stone text-sm"
                               value={editForm.name}
                               onChange={e => setEditForm({ ...editForm, name: e.target.value })}
                             />
@@ -451,12 +450,12 @@ export function ProductsPage() {
                             <div className="flex gap-1">
                               <input
                                 type="number"
-                                className="w-16 px-2 py-1 rounded border border-gray-300 text-sm"
+                                className="w-16 px-2 py-1 rounded border border-stone text-sm"
                                 value={editForm.pack_size}
                                 onChange={e => setEditForm({ ...editForm, pack_size: e.target.value })}
                               />
                               <select
-                                className="w-16 px-1 py-1 rounded border border-gray-300 text-sm"
+                                className="w-16 px-1 py-1 rounded border border-stone text-sm"
                                 value={editForm.pack_unit}
                                 onChange={e => setEditForm({ ...editForm, pack_unit: e.target.value })}
                               >
@@ -470,11 +469,11 @@ export function ProductsPage() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
-                              <span className="text-gray-500">£</span>
+                              <span className="text-stone">£</span>
                               <input
                                 type="number"
                                 step="0.01"
-                                className="w-20 px-2 py-1 rounded border border-gray-300 text-sm"
+                                className="w-20 px-2 py-1 rounded border border-stone text-sm"
                                 value={editForm.price}
                                 onChange={e => setEditForm({ ...editForm, price: e.target.value })}
                               />
@@ -482,7 +481,7 @@ export function ProductsPage() {
                           </td>
                           <td className="px-4 py-3">
                             <select
-                              className="px-2 py-1 rounded border border-gray-200 text-sm"
+                              className="px-2 py-1 rounded border border-line text-sm"
                               value={editForm.category_id}
                               onChange={e => setEditForm({ ...editForm, category_id: e.target.value })}
                             >
@@ -496,13 +495,13 @@ export function ProductsPage() {
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => saveEdit(product.id)}
-                                className="p-1.5 text-green-600 hover:bg-green-50 rounded"
+                                className="p-1.5 text-sage hover:bg-sage-tint rounded"
                               >
                                 <Check className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => setEditingId(null)}
-                                className="p-1.5 text-gray-400 hover:bg-gray-100 rounded"
+                                className="p-1.5 text-ash hover:bg-line-soft rounded"
                               >
                                 <X className="w-4 h-4" />
                               </button>
@@ -511,29 +510,29 @@ export function ProductsPage() {
                         </>
                       ) : (
                         <>
-                          <td className="px-4 py-3 text-sm font-mono text-gray-600">{product.code}</td>
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                          <td className="px-4 py-3 text-sm font-mono text-ink">{product.code}</td>
+                          <td className="px-4 py-3 text-sm font-medium text-basalt">
                             <span className="flex items-center gap-2">
                               {product.name}
                               {savedId === product.id && (
-                                <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">
+                                <span className="px-2 py-0.5 bg-sage-tint text-sage text-xs rounded-full font-medium">
                                   Saved ✓
                                 </span>
                               )}
                             </span>
                             {product.description && (
-                              <p className="text-xs text-gray-500 font-normal mt-0.5 truncate max-w-xs" title={product.description}>
+                              <p className="text-xs text-stone font-normal mt-0.5 truncate max-w-xs" title={product.description}>
                                 {product.description}
                               </p>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{product.pack_size}{product.pack_unit}</td>
+                          <td className="px-4 py-3 text-sm text-ink">{product.pack_size}{product.pack_unit}</td>
                           <td className="px-4 py-3 text-sm font-medium">£{formatCurrency(product.price)}</td>
                           <td className="px-4 py-3 text-sm">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                               product.is_active
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-gray-100 text-gray-500'
+                                ? 'bg-sage-tint text-sage'
+                                : 'bg-line-soft text-stone'
                             }`}>
                               {product.is_active ? 'Active' : 'Inactive'}
                             </span>
@@ -542,7 +541,7 @@ export function ProductsPage() {
                             <div className="flex items-center gap-3">
                               <button
                                 onClick={() => startEdit(product)}
-                                className="p-1 text-gray-400 hover:text-magma hover:bg-orange-50 rounded"
+                                className="p-1 text-ash hover:text-molten-ink hover:bg-molten-tint rounded"
                                 title="Edit product"
                               >
                                 <Pencil className="w-4 h-4" />
@@ -550,17 +549,17 @@ export function ProductsPage() {
                               <button
                                 onClick={() => toggleActive(product.id, product.is_active)}
                                 className={`relative w-10 h-6 rounded-full transition-colors ${
-                                  product.is_active ? 'bg-green-500' : 'bg-gray-300'
+                                  product.is_active ? 'bg-sage' : 'bg-ash'
                                 }`}
                                 title={product.is_active ? 'Click to disable' : 'Click to enable'}
                               >
-                                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                                <span className={`absolute top-1 w-4 h-4 rounded-full bg-bone shadow transition-transform ${
                                   product.is_active ? 'left-5' : 'left-1'
                                 }`} />
                               </button>
                               <button
                                 onClick={() => deleteProduct(product.id, product.name)}
-                                className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                                className="p-1 text-ash hover:text-danger hover:bg-danger-tint rounded"
                                 title="Delete product"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -572,14 +571,14 @@ export function ProductsPage() {
                     </tr>
                     {/* Description row when editing */}
                     {editingId === product.id && (
-                      <tr className="bg-orange-50">
+                      <tr className="bg-molten-tint">
                         <td colSpan={7} className="px-4 py-3">
                           <div className="flex items-start gap-3">
-                            <label className="text-sm font-medium text-gray-700 pt-2 whitespace-nowrap">
+                            <label className="text-sm font-medium text-ink pt-2 whitespace-nowrap">
                               Tooltip info:
                             </label>
                             <textarea
-                              className="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-sm resize-none"
+                              className="flex-1 px-3 py-2 rounded-lg border border-stone text-sm resize-none"
                               rows={2}
                               placeholder="Brief product description shown in calculator tooltip (e.g. 'High-build base coat for floors. Apply with trowel.')"
                               value={editForm.description}

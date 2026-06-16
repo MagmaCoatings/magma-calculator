@@ -102,7 +102,7 @@ export function SettingsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
+        <RefreshCw className="w-6 h-6 animate-spin text-ash" />
       </div>
     )
   }
@@ -111,8 +111,8 @@ export function SettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-500">Manage calculator defaults and pricing</p>
+          <h1 className="text-2xl font-bold text-basalt">Settings</h1>
+          <p className="text-stone">Manage calculator defaults and pricing</p>
         </div>
         <Button onClick={saveSettings} disabled={saving}>
           <Save className="w-4 h-4 mr-2" />
@@ -121,7 +121,7 @@ export function SettingsPage() {
       </div>
 
       {message && (
-        <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+        <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-sage-tint text-sage' : 'bg-danger-tint text-danger'}`}>
           {message.text}
         </div>
       )}
@@ -137,19 +137,19 @@ export function SettingsPage() {
               const config = settingLabels[setting.key] || { label: setting.key, type: 'text' }
               return (
                 <div key={setting.id} className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-ink">
                     {config.label}
-                    {config.unit && <span className="text-gray-400 ml-1">({config.unit})</span>}
+                    {config.unit && <span className="text-ash ml-1">({config.unit})</span>}
                   </label>
                   <input
                     type={config.type}
                     value={values[setting.key] || ''}
                     onChange={e => updateValue(setting.key, e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-line rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     step={config.type === 'number' ? 'any' : undefined}
                   />
                   {setting.description && (
-                    <p className="text-xs text-gray-400">{setting.description}</p>
+                    <p className="text-xs text-ash">{setting.description}</p>
                   )}
                 </div>
               )
@@ -164,7 +164,7 @@ export function SettingsPage() {
           <CardDescription>Group systems by product family (Microcement, Terrazzo, etc.)</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-stone">
             System families are managed in the Systems admin page. Each system can be assigned a family
             which helps group related floor and wall systems together.
           </p>

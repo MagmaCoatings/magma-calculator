@@ -43,16 +43,16 @@ export function AdminDashboard() {
   }
 
   const statCards = [
-    { label: 'Total Quotes', value: stats.totalQuotes, icon: FileText, href: '/quotes', color: 'text-blue-600 bg-blue-100' },
-    { label: 'Users', value: stats.totalUsers, icon: Users, href: '/admin/users', color: 'text-green-600 bg-green-100' },
-    { label: 'Products', value: stats.totalProducts, icon: Package, href: '/admin/products', color: 'text-purple-600 bg-purple-100' },
-    { label: 'Logins (7d)', value: stats.recentLogins, icon: Activity, href: '/admin/logs', color: 'text-orange-600 bg-orange-100' },
+    { label: 'Total Quotes', value: stats.totalQuotes, icon: FileText, href: '/quotes', color: 'text-molten-ink bg-molten-tint' },
+    { label: 'Users', value: stats.totalUsers, icon: Users, href: '/admin/users', color: 'text-sage bg-sage-tint' },
+    { label: 'Products', value: stats.totalProducts, icon: Package, href: '/admin/products', color: 'text-stone bg-track' },
+    { label: 'Logins (7d)', value: stats.recentLogins, icon: Activity, href: '/admin/logs', color: 'text-molten-ink bg-molten-tint' },
   ]
 
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <div className="w-8 h-8 border-4 border-magma border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-molten border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -60,8 +60,8 @@ export function AdminDashboard() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 text-sm mt-1">System overview</p>
+        <h1 className="text-2xl font-bold text-basalt">Dashboard</h1>
+        <p className="text-stone text-sm mt-1">System overview</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -73,8 +73,8 @@ export function AdminDashboard() {
                   <stat.icon className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                  <p className="text-sm text-gray-500">{stat.label}</p>
+                  <p className="text-2xl font-bold text-basalt">{stat.value}</p>
+                  <p className="text-sm text-stone">{stat.label}</p>
                 </div>
               </div>
             </Card>

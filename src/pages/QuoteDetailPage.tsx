@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/formatters'
 import { ArrowLeft, Pencil, Save, Copy, Trash2, FileText, Send, CheckCircle, XCircle, Plus, Download, Mail, History, Clock } from 'lucide-react'
 import { QuotePDF } from '@/components/QuotePDF'
+import { MagmaSpinner } from '@/components/brand/MagmaMark'
 import { 
   logQuoteStatusChange, 
   logQuoteUpdated, 
@@ -468,6 +469,9 @@ Subtotal: £${formatCurrency(quote.subtotal)}
 VAT (20%): £${formatCurrency(quote.vat)}
 Total: £${formatCurrency(quote.total)}
 
+PALLET / DELIVERY COSTS: TBC
+(Quoted at time of order)
+
 Thank you...`
 
     const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
@@ -487,7 +491,7 @@ Thank you...`
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <div className="w-8 h-8 border-4 border-magma border-t-transparent rounded-full animate-spin" />
+        <MagmaSpinner size={48} />
       </div>
     )
   }
@@ -495,7 +499,7 @@ Thank you...`
   if (!quote) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8 text-center">
-        <p className="text-gray-500">Quote not found</p>
+        <p className="text-stone">Quote not found</p>
         <Button onClick={() => navigate('/quotes')} className="mt-4">Back to Quotes</Button>
       </div>
     )
@@ -508,13 +512,13 @@ Thank you...`
         <div>
           <button
             onClick={() => navigate('/quotes')}
-            className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm mb-2"
+            className="flex items-center gap-1 text-stone hover:text-ink text-sm mb-2"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Quotes
           </button>
-          <h1 className="text-2xl font-bold text-gray-900 font-mono">{quote.reference}</h1>
-          <p className="text-gray-500 text-sm mt-1">Created {formatDate(quote.created_at)}</p>
+          <h1 className="text-2xl font-bold text-basalt font-mono">{quote.reference}</h1>
+          <p className="text-stone text-sm mt-1">Created {formatDate(quote.created_at)}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <PDFDownloadLink
@@ -535,12 +539,12 @@ Thank you...`
               />
             }
             fileName={`${quote.reference}.pdf`}
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50"
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md border border-line bg-bone hover:bg-limestone"
           >
             {({ loading: pdfLoading }) =>
               pdfLoading ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  <MagmaSpinner size={16} />
                   Generating...
                 </>
               ) : (
@@ -567,7 +571,7 @@ Thank you...`
           >
             <History className="w-4 h-4 mr-1" /> History
           </Button>
-          <Button variant="outline" size="sm" onClick={deleteQuote} className="text-red-600 hover:bg-red-50">
+          <Button variant="outline" size="sm" onClick={deleteQuote} className="text-danger hover:bg-danger-tint">
             <Trash2 className="w-4 h-4" />
           </Button>
         </div>
@@ -577,7 +581,7 @@ Thank you...`
       <Card className="mb-6">
         <CardContent className="py-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Status:</span>
+            <span className="text-sm font-medium text-ink">Status:</span>
             <div className="flex gap-2">
               {[
                 { key: 'draft', label: 'Draft', icon: FileText, color: 'gray' },
@@ -590,11 +594,11 @@ Thank you...`
                   onClick={() => updateStatus(s.key)}
                   className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                     quote.status === s.key
-                      ? s.color === 'gray' ? 'bg-gray-200 text-gray-700'
-                      : s.color === 'blue' ? 'bg-blue-100 text-blue-700'
-                      : s.color === 'green' ? 'bg-green-100 text-green-700'
-                      : 'bg-red-100 text-red-700'
-                      : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                      ? s.color === 'gray' ? 'bg-track text-ink'
+                      : s.color === 'blue' ? 'bg-molten-tint text-molten-ink'
+                      : s.color === 'green' ? 'bg-sage-tint text-sage'
+                      : 'bg-danger-tint text-danger'
+                      : 'bg-limestone text-ash hover:bg-line-soft'
                   }`}
                 >
                   <s.icon className="w-3.5 h-3.5" />
@@ -633,9 +637,9 @@ Thank you...`
                   placeholder="e.g. Kitchen Floor"
                 />
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <label className="block text-sm font-medium text-ink mb-1">Notes</label>
                   <textarea
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 resize-none"
+                    className="w-full px-3 py-2 rounded-lg border border-line resize-none"
                     rows={3}
                     value={editForm.notes}
                     onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
@@ -652,19 +656,19 @@ Thank you...`
             ) : (
               <div className="space-y-3">
                 <div>
-                  <span className="text-sm text-gray-500">Client</span>
-                  <p className="font-medium">{quote.client_name || <span className="text-gray-400 italic">Not specified</span>}</p>
+                  <span className="text-sm text-stone">Client</span>
+                  <p className="font-medium">{quote.client_name || <span className="text-ash italic">Not specified</span>}</p>
                 </div>
                 <div>
-                  <span className="text-sm text-gray-500">Project</span>
-                  <p className="font-medium">{quote.project_name || <span className="text-gray-400 italic">Not specified</span>}</p>
+                  <span className="text-sm text-stone">Project</span>
+                  <p className="font-medium">{quote.project_name || <span className="text-ash italic">Not specified</span>}</p>
                 </div>
                 <div>
-                  <span className="text-sm text-gray-500">Surface Type</span>
+                  <span className="text-sm text-stone">Surface Type</span>
                   <p className="font-medium">{quote.surface_type}</p>
                 </div>
                 <div>
-                  <span className="text-sm text-gray-500">Area</span>
+                  <span className="text-sm text-stone">Area</span>
                   <p className="font-medium">
                     {quote.surface_type === 'floor' && `${quote.floor_area}m²`}
                     {quote.surface_type === 'wall' && `${quote.wall_area}m²`}
@@ -673,7 +677,7 @@ Thank you...`
                 </div>
                 {quote.notes && (
                   <div>
-                    <span className="text-sm text-gray-500">Notes</span>
+                    <span className="text-sm text-stone">Notes</span>
                     <p className="font-medium whitespace-pre-wrap">{quote.notes}</p>
                   </div>
                 )}
@@ -690,17 +694,17 @@ Thank you...`
           <CardContent>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-gray-500">Subtotal</span>
+                <span className="text-stone">Subtotal</span>
                 <span className="font-medium">£{formatCurrency(quote.subtotal)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">VAT (20%)</span>
+                <span className="text-stone">VAT (20%)</span>
                 <span className="font-medium">£{formatCurrency(quote.vat)}</span>
               </div>
-              <div className="border-t border-gray-100 pt-2 mt-2">
+              <div className="border-t border-line-soft pt-2 mt-2">
                 <div className="flex justify-between">
-                  <span className="font-semibold">Total</span>
-                  <span className="text-xl font-bold text-magma">£{formatCurrency(quote.total)}</span>
+                  <span className="font-medium">Total</span>
+                  <span className="text-xl font-bold text-molten-ink">£{formatCurrency(quote.total)}</span>
                 </div>
               </div>
             </div>
@@ -719,24 +723,24 @@ Thank you...`
         <CardContent className="p-0">
           {/* Smart calculation explanation */}
           {items.some(item => item.product_name.includes('✦')) && (
-            <div className="mx-4 mt-4 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
-              <p className="text-xs text-purple-700">
-                <span className="font-semibold">✦ Smart calculation:</span> These materials were calculated once for the combined floor + wall area — no need to buy separately for each surface.
+            <div className="mx-4 mt-4 bg-molten-tint border border-line rounded-lg px-3 py-2">
+              <p className="text-xs text-stone">
+                <span className="font-medium">✦ Smart calculation:</span> These materials were calculated once for the combined floor + wall area — no need to buy separately for each surface.
               </p>
             </div>
           )}
           
           {/* Add product form */}
           {showAddProduct && (
-            <div className="mx-4 mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <h4 className="font-medium text-gray-900 mb-3">Add Product</h4>
+            <div className="mx-4 mt-4 p-4 bg-limestone rounded-lg border border-line">
+              <h4 className="font-medium text-basalt mb-3">Add Product</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
-                  <label className="block text-sm text-gray-600 mb-1">Product</label>
+                  <label className="block text-sm text-ink mb-1">Product</label>
                   <select
                     value={selectedProductId}
                     onChange={e => setSelectedProductId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                    className="w-full px-3 py-2 border border-line rounded-lg bg-bone"
                   >
                     <option value="">Select a product...</option>
                     {products.map(p => (
@@ -747,7 +751,7 @@ Thank you...`
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">Quantity</label>
+                  <label className="block text-sm text-ink mb-1">Quantity</label>
                   <Input
                     type="number"
                     min="1"
@@ -772,12 +776,12 @@ Thank you...`
           )}
           
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
+            <thead className="bg-track border-b border-line">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qty</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Unit Price</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-stone uppercase">Product</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-stone uppercase">Qty</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-stone uppercase">Unit Price</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-stone uppercase">Total</th>
                 <th className="px-4 py-3 w-20"></th>
               </tr>
             </thead>
@@ -785,26 +789,23 @@ Thank you...`
               {items.map(item => (
                 <tr key={item.id}>
                   <td className="px-4 py-3">
-                    <span className="font-medium text-gray-900">{item.product_name}</span>
-                    {item.product_code && (
-                      <span className="text-gray-400 text-sm ml-2">({item.product_code})</span>
-                    )}
+                    <span className="font-medium text-basalt">{item.product_name}</span>
                   </td>
-                  <td className="px-4 py-3 text-right text-gray-600">
+                  <td className="px-4 py-3 text-right text-ink">
                     {editingItemId === item.id ? (
                       <input
                         type="number"
                         min="1"
                         value={editItemQty}
                         onChange={e => setEditItemQty(parseInt(e.target.value) || 1)}
-                        className="w-16 px-2 py-1 text-right border border-gray-300 rounded"
+                        className="w-16 px-2 py-1 text-right border border-stone rounded"
                         autoFocus
                       />
                     ) : (
                       item.quantity
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right text-gray-600">£{formatCurrency(item.unit_price)}</td>
+                  <td className="px-4 py-3 text-right text-ink">£{formatCurrency(item.unit_price)}</td>
                   <td className="px-4 py-3 text-right font-medium">
                     £{formatCurrency(editingItemId === item.id ? editItemQty * item.unit_price : item.line_total)}
                   </td>
@@ -813,14 +814,14 @@ Thank you...`
                       <div className="flex gap-1 justify-end">
                         <button
                           onClick={() => saveItemEdit(item)}
-                          className="p-1 text-green-600 hover:bg-green-50 rounded"
+                          className="p-1 text-sage hover:bg-sage-tint rounded"
                           title="Save"
                         >
                           <Save className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setEditingItemId(null)}
-                          className="p-1 text-gray-400 hover:bg-gray-100 rounded"
+                          className="p-1 text-ash hover:bg-line-soft rounded"
                           title="Cancel"
                         >
                           <XCircle className="w-4 h-4" />
@@ -830,14 +831,14 @@ Thank you...`
                       <div className="flex gap-1 justify-end">
                         <button
                           onClick={() => startEditItem(item)}
-                          className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                          className="p-1 text-ash hover:text-molten-ink hover:bg-molten-tint rounded"
                           title="Edit quantity"
                         >
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => deleteItem(item)}
-                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                          className="p-1 text-ash hover:text-danger hover:bg-danger-tint rounded"
                           title="Remove item"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -863,12 +864,12 @@ Thank you...`
           </CardHeader>
           <CardContent>
             {history.length === 0 ? (
-              <p className="text-gray-500 text-sm">No history recorded yet.</p>
+              <p className="text-stone text-sm">No history recorded yet.</p>
             ) : (
               <div className="space-y-3">
                 {history.map(entry => (
-                  <div key={entry.id} className="flex gap-3 text-sm border-b border-gray-100 pb-3 last:border-0">
-                    <div className="flex-shrink-0 w-24 text-gray-400">
+                  <div key={entry.id} className="flex gap-3 text-sm border-b border-line-soft pb-3 last:border-0">
+                    <div className="flex-shrink-0 w-24 text-ash">
                       {new Date(entry.created_at).toLocaleDateString('en-GB', {
                         day: 'numeric',
                         month: 'short',
@@ -883,7 +884,7 @@ Thank you...`
                     </div>
                     <div className="flex-1">
                       {entry.action === 'created' && (
-                        <span className="text-green-600">Quote created</span>
+                        <span className="text-sage">Quote created</span>
                       )}
                       {entry.action === 'status_changed' && (
                         <span>
@@ -902,12 +903,12 @@ Thank you...`
                         </span>
                       )}
                       {entry.action === 'item_added' && (
-                        <span className="text-green-600">
+                        <span className="text-sage">
                           Added <span className="font-medium">{entry.details?.productName}</span> × {entry.details?.quantity}
                         </span>
                       )}
                       {entry.action === 'item_removed' && (
-                        <span className="text-red-600">
+                        <span className="text-danger">
                           Removed <span className="font-medium">{entry.details?.productName}</span>
                         </span>
                       )}
@@ -917,12 +918,12 @@ Thank you...`
                         </span>
                       )}
                       {entry.action === 'duplicated' && (
-                        <span className="text-blue-600">
+                        <span className="text-molten-ink">
                           Duplicated from <span className="font-medium">{entry.details?.sourceReference}</span>
                         </span>
                       )}
                       {entry.user && (
-                        <span className="text-gray-400 ml-2">
+                        <span className="text-ash ml-2">
                           by {entry.user.full_name || entry.user.email}
                         </span>
                       )}

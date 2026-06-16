@@ -116,7 +116,7 @@ export function LoginLogsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <div className="w-8 h-8 border-4 border-magma border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-molten border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -128,8 +128,8 @@ export function LoginLogsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Login Logs</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-basalt">Login Logs</h1>
+          <p className="text-stone text-sm mt-1">
             {successCount} successful, {failedCount} failed (last 1000 entries)
           </p>
         </div>
@@ -138,11 +138,11 @@ export function LoginLogsPage() {
       {/* Filters */}
       <div className="flex gap-4 mb-6">
         <div className="relative flex-1">
-          <Activity className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Activity className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ash" />
           <input
             type="text"
             placeholder="Search by email, name, IP, city, or country..."
-            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200"
+            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-line bg-track text-base"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -159,7 +159,7 @@ export function LoginLogsPage() {
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 successFilter === option.value
                   ? 'bg-charcoal text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-line-soft text-ink hover:bg-track'
               }`}
             >
               {option.label}
@@ -171,9 +171,9 @@ export function LoginLogsPage() {
       {/* Logs List */}
       {filteredLogs.length === 0 ? (
         <Card className="p-12 text-center">
-          <Activity className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No logs found</h3>
-          <p className="text-gray-500">Try adjusting your search or filters</p>
+          <Activity className="w-12 h-12 text-ash mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-basalt mb-2">No logs found</h3>
+          <p className="text-stone">Try adjusting your search or filters</p>
         </Card>
       ) : (
         <div className="space-y-2">
@@ -182,18 +182,18 @@ export function LoginLogsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-1">
-                    <span className={`w-2 h-2 rounded-full ${log.success ? 'bg-green-500' : 'bg-red-500'}`} />
-                    <span className="font-medium text-gray-900">
+                    <span className={`w-2 h-2 rounded-full ${log.success ? 'bg-sage' : 'bg-danger'}`} />
+                    <span className="font-medium text-basalt">
                       {log.user_name || log.email}
                     </span>
                     {!log.success && (
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-danger-tint text-danger">
                         <AlertTriangle className="w-3 h-3" />
                         Failed
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                  <div className="flex items-center gap-4 text-xs text-stone">
                     <span className="flex items-center gap-1">
                       {getDeviceIcon(log.device_type)}
                       {log.browser || 'Unknown browser'} / {log.os || 'Unknown OS'}
@@ -203,14 +203,14 @@ export function LoginLogsPage() {
                       {getLocation(log)}
                     </span>
                     {log.ip_address && (
-                      <span className="font-mono text-gray-400">{log.ip_address}</span>
+                      <span className="font-mono text-ash">{log.ip_address}</span>
                     )}
                   </div>
                   {log.failure_reason && (
-                    <p className="text-xs text-red-600 mt-1">{log.failure_reason}</p>
+                    <p className="text-xs text-danger mt-1">{log.failure_reason}</p>
                   )}
                 </div>
-                <div className="text-right text-xs text-gray-400">
+                <div className="text-right text-xs text-ash">
                   {formatDate(log.created_at)}
                 </div>
               </div>
@@ -220,7 +220,7 @@ export function LoginLogsPage() {
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-4 border-t">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-stone">
                 Showing {startIndex + 1}-{Math.min(endIndex, filteredLogs.length)} of {filteredLogs.length} logs
               </p>
               <div className="flex items-center gap-2">
@@ -233,7 +233,7 @@ export function LoginLogsPage() {
                   <ChevronLeft className="w-4 h-4" />
                   Previous
                 </Button>
-                <span className="px-3 py-1 text-sm text-gray-600">
+                <span className="px-3 py-1 text-sm text-ink">
                   Page {currentPage} of {totalPages}
                 </span>
                 <Button

@@ -134,7 +134,7 @@ export function ProfilePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <div className="w-8 h-8 border-4 border-magma border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-molten border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -142,60 +142,60 @@ export function ProfilePage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
-        <p className="text-gray-500 text-sm mt-1">Manage your account details</p>
+        <h1 className="text-2xl font-bold text-basalt">My Profile</h1>
+        <p className="text-stone text-sm mt-1">Manage your account details</p>
       </div>
 
       <div className="space-y-6">
         {/* Personal Details */}
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4">
-            <User className="w-5 h-5 text-gray-400" />
-            <h2 className="font-semibold text-gray-900">Personal Details</h2>
+            <User className="w-5 h-5 text-ash" />
+            <h2 className="font-medium text-basalt">Personal Details</h2>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+              <label className="block text-sm font-medium text-ink mb-1">First Name</label>
               <input
                 type="text"
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-magma focus:border-transparent"
+                className="w-full px-3 py-2 rounded-lg border border-line focus:outline-none focus:ring-2 focus:ring-molten focus:border-transparent"
                 value={form.first_name}
                 onChange={e => handleChange('first_name', e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+              <label className="block text-sm font-medium text-ink mb-1">Last Name</label>
               <input
                 type="text"
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-magma focus:border-transparent"
+                className="w-full px-3 py-2 rounded-lg border border-line focus:outline-none focus:ring-2 focus:ring-molten focus:border-transparent"
                 value={form.last_name}
                 onChange={e => handleChange('last_name', e.target.value)}
               />
             </div>
           </div>
           <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-ink mb-1">Email</label>
             <input
               type="email"
-              className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-gray-500"
+              className="w-full px-3 py-2 rounded-lg border border-line bg-limestone text-stone"
               value={profile?.email || ''}
               disabled
             />
-            <p className="text-xs text-gray-400 mt-1">Contact support to change your email</p>
+            <p className="text-xs text-ash mt-1">Contact support to change your email</p>
           </div>
         </Card>
 
         {/* Company Details */}
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4">
-            <Building className="w-5 h-5 text-gray-400" />
-            <h2 className="font-semibold text-gray-900">Company Details</h2>
+            <Building className="w-5 h-5 text-ash" />
+            <h2 className="font-medium text-basalt">Company Details</h2>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+            <label className="block text-sm font-medium text-ink mb-1">Company Name</label>
             <input
               type="text"
-              className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-magma focus:border-transparent"
+              className="w-full px-3 py-2 rounded-lg border border-line focus:outline-none focus:ring-2 focus:ring-molten focus:border-transparent"
               value={form.company_name}
               onChange={e => handleChange('company_name', e.target.value)}
             />
@@ -205,52 +205,52 @@ export function ProfilePage() {
         {/* Address */}
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4">
-            <MapPin className="w-5 h-5 text-gray-400" />
-            <h2 className="font-semibold text-gray-900">Address</h2>
+            <MapPin className="w-5 h-5 text-ash" />
+            <h2 className="font-medium text-basalt">Address</h2>
           </div>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1</label>
+              <label className="block text-sm font-medium text-ink mb-1">Address Line 1</label>
               <input
                 type="text"
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-magma focus:border-transparent"
+                className="w-full px-3 py-2 rounded-lg border border-line focus:outline-none focus:ring-2 focus:ring-molten focus:border-transparent"
                 value={form.address_line1}
                 onChange={e => handleChange('address_line1', e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label>
+              <label className="block text-sm font-medium text-ink mb-1">Address Line 2</label>
               <input
                 type="text"
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-magma focus:border-transparent"
+                className="w-full px-3 py-2 rounded-lg border border-line focus:outline-none focus:ring-2 focus:ring-molten focus:border-transparent"
                 value={form.address_line2}
                 onChange={e => handleChange('address_line2', e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 3</label>
+              <label className="block text-sm font-medium text-ink mb-1">Address Line 3</label>
               <input
                 type="text"
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-magma focus:border-transparent"
+                className="w-full px-3 py-2 rounded-lg border border-line focus:outline-none focus:ring-2 focus:ring-molten focus:border-transparent"
                 value={form.address_line3}
                 onChange={e => handleChange('address_line3', e.target.value)}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Town / City</label>
+                <label className="block text-sm font-medium text-ink mb-1">Town / City</label>
                 <input
                   type="text"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-magma focus:border-transparent"
+                  className="w-full px-3 py-2 rounded-lg border border-line focus:outline-none focus:ring-2 focus:ring-molten focus:border-transparent"
                   value={form.town_city}
                   onChange={e => handleChange('town_city', e.target.value)}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Postcode</label>
+                <label className="block text-sm font-medium text-ink mb-1">Postcode</label>
                 <input
                   type="text"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-magma focus:border-transparent uppercase"
+                  className="w-full px-3 py-2 rounded-lg border border-line focus:outline-none focus:ring-2 focus:ring-molten focus:border-transparent uppercase"
                   value={form.postcode}
                   onChange={e => handleChange('postcode', e.target.value)}
                   placeholder="CM2 8RF"
@@ -263,24 +263,24 @@ export function ProfilePage() {
         {/* Contact */}
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4">
-            <Phone className="w-5 h-5 text-gray-400" />
-            <h2 className="font-semibold text-gray-900">Contact Numbers</h2>
+            <Phone className="w-5 h-5 text-ash" />
+            <h2 className="font-medium text-basalt">Contact Numbers</h2>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <label className="block text-sm font-medium text-ink mb-1">Phone</label>
               <input
                 type="tel"
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-magma focus:border-transparent"
+                className="w-full px-3 py-2 rounded-lg border border-line focus:outline-none focus:ring-2 focus:ring-molten focus:border-transparent"
                 value={form.phone}
                 onChange={e => handleChange('phone', e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mobile (if different)</label>
+              <label className="block text-sm font-medium text-ink mb-1">Mobile (if different)</label>
               <input
                 type="tel"
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-magma focus:border-transparent"
+                className="w-full px-3 py-2 rounded-lg border border-line focus:outline-none focus:ring-2 focus:ring-molten focus:border-transparent"
                 value={form.mobile}
                 onChange={e => handleChange('mobile', e.target.value)}
               />
@@ -291,15 +291,15 @@ export function ProfilePage() {
         {/* Social / Web */}
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4">
-            <Globe className="w-5 h-5 text-gray-400" />
-            <h2 className="font-semibold text-gray-900">Online Presence</h2>
+            <Globe className="w-5 h-5 text-ash" />
+            <h2 className="font-medium text-basalt">Online Presence</h2>
           </div>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+              <label className="block text-sm font-medium text-ink mb-1">Website</label>
               <input
                 type="url"
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-magma focus:border-transparent"
+                className="w-full px-3 py-2 rounded-lg border border-line focus:outline-none focus:ring-2 focus:ring-molten focus:border-transparent"
                 value={form.website_url}
                 onChange={e => handleChange('website_url', e.target.value)}
                 placeholder="https://yourwebsite.com"
@@ -307,12 +307,12 @@ export function ProfilePage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Instagram</label>
+                <label className="block text-sm font-medium text-ink mb-1">Instagram</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">@</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ash">@</span>
                   <input
                     type="text"
-                    className="w-full pl-8 pr-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-magma focus:border-transparent"
+                    className="w-full pl-8 pr-3 py-2 rounded-lg border border-line focus:outline-none focus:ring-2 focus:ring-molten focus:border-transparent"
                     value={form.instagram_handle}
                     onChange={e => handleChange('instagram_handle', normaliseInstagramHandle(e.target.value))}
                     placeholder="yourhandle"
@@ -320,10 +320,10 @@ export function ProfilePage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Facebook</label>
+                <label className="block text-sm font-medium text-ink mb-1">Facebook</label>
                 <input
                   type="url"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-magma focus:border-transparent"
+                  className="w-full px-3 py-2 rounded-lg border border-line focus:outline-none focus:ring-2 focus:ring-molten focus:border-transparent"
                   value={form.facebook_url}
                   onChange={e => handleChange('facebook_url', e.target.value)}
                   placeholder="https://facebook.com/yourpage"
@@ -335,24 +335,24 @@ export function ProfilePage() {
 
         {/* Preferences */}
         <Card className="p-6">
-          <h2 className="font-semibold text-gray-900 mb-4">Preferences</h2>
+          <h2 className="font-medium text-basalt mb-4">Preferences</h2>
           <label className="flex items-center gap-3 cursor-pointer">
             <input
               type="checkbox"
-              className="w-5 h-5 rounded border-gray-300 text-magma focus:ring-magma"
+              className="w-5 h-5 rounded border-stone text-molten-ink focus:ring-molten"
               checked={form.show_tooltips}
               onChange={e => handleChange('show_tooltips', e.target.checked)}
             />
             <div>
-              <p className="text-sm font-medium text-gray-900">Show product tooltips</p>
-              <p className="text-xs text-gray-500">Display helpful info icons next to products in the calculator</p>
+              <p className="text-sm font-medium text-basalt">Show product tooltips</p>
+              <p className="text-xs text-stone">Display helpful info icons next to products in the calculator</p>
             </div>
           </label>
         </Card>
 
         {/* Save */}
         {error && (
-          <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>
+          <div className="p-3 bg-danger-tint text-danger rounded-lg text-sm">{error}</div>
         )}
         
         <div className="flex justify-end">

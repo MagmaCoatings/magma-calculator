@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { MagmaMark } from '@/components/brand/MagmaMark'
 import { 
   LayoutDashboard, 
   Package, 
@@ -33,30 +34,28 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const { signOut } = useAuth()
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-limestone">
       {/* Top header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
+      <header className="bg-bone border-b border-line px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">M</span>
-            </div>
+            <MagmaMark size={40} />
             <div>
-              <h1 className="font-bold text-gray-900">Magma Admin</h1>
-              <p className="text-xs text-gray-500">Calculator Management</p>
+              <h1 className="font-medium text-basalt">Magma Admin</h1>
+              <p className="text-xs text-stone">Calculator Management</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <Link 
               to="/"
-              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
+              className="flex items-center gap-2 px-3 py-2 text-sm text-ink hover:text-basalt hover:bg-line-soft rounded-lg transition min-h-[44px]"
             >
               <Calculator className="w-4 h-4" />
               Calculator
             </Link>
             <button
               onClick={() => signOut()}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
+              className="flex items-center gap-2 px-3 py-2 text-sm text-ink hover:text-basalt hover:bg-line-soft rounded-lg transition min-h-[44px]"
             >
               <LogOut className="w-4 h-4" />
               Sign Out
@@ -67,7 +66,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
       <div className="flex">
         {/* Sidebar */}
-        <aside className="w-64 bg-white border-r border-gray-200 min-h-[calc(100vh-73px)]">
+        <aside className="w-64 bg-bone border-r border-line min-h-[calc(100vh-73px)]">
           <nav className="p-4 space-y-1">
             {navItems.map(item => {
               const Icon = item.icon
@@ -76,13 +75,13 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition min-h-[44px] ${
                     isActive
-                      ? 'bg-orange-50 text-orange-700'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      ? 'bg-molten-tint text-basalt'
+                      : 'text-ink hover:bg-line-soft hover:text-basalt'
                   }`}
                 >
-                  <Icon className={`w-5 h-5 ${isActive ? 'text-orange-600' : 'text-gray-400'}`} />
+                  <Icon className={`w-5 h-5 ${isActive ? 'text-molten' : 'text-ash'}`} />
                   {item.label}
                 </Link>
               )

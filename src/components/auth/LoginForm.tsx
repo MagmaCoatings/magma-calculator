@@ -31,11 +31,11 @@ export function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-limestone px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4">
-            <span className="text-3xl font-bold text-magma">MAGMA</span>
+            <span className="text-3xl font-bold text-molten-ink">MAGMA</span>
           </div>
           <CardTitle>Calculator Login</CardTitle>
           <CardDescription>
@@ -45,7 +45,7 @@ export function LoginForm() {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             {error && (
-              <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">
+              <div className="p-3 rounded-lg bg-danger-tint text-danger text-sm">
                 {error}
               </div>
             )}
@@ -73,7 +73,7 @@ export function LoginForm() {
             <button
               type="button"
               onClick={() => setShowForgot(true)}
-              className="text-sm text-gray-500 hover:text-magma"
+              className="text-sm text-stone hover:text-molten-ink"
             >
               Forgot your password?
             </button>
@@ -108,7 +108,7 @@ function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-limestone px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle>Reset Password</CardTitle>
@@ -118,7 +118,7 @@ function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
         </CardHeader>
         {success ? (
           <CardContent className="text-center">
-            <div className="p-4 rounded-lg bg-green-50 text-green-600 mb-4">
+            <div className="p-4 rounded-lg bg-sage-tint text-sage mb-4">
               Check your email for a password reset link.
             </div>
             <Button variant="outline" onClick={onBack}>
@@ -129,7 +129,7 @@ function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
               {error && (
-                <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">
+                <div className="p-3 rounded-lg bg-danger-tint text-danger text-sm">
                   {error}
                 </div>
               )}
@@ -149,7 +149,7 @@ function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
               <button
                 type="button"
                 onClick={onBack}
-                className="text-sm text-gray-500 hover:text-magma"
+                className="text-sm text-stone hover:text-molten-ink"
               >
                 Back to login
               </button>
