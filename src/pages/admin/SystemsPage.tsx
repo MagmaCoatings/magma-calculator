@@ -1023,7 +1023,7 @@ export function SystemsPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Only show when selected</label>
                   <select
-                    value={productForm.depends_on_product_id}
+                    value={productForm.depends_on_product_id || ''}
                     onChange={e => setProductForm({ ...productForm, depends_on_product_id: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg"
                   >
