@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Users, Mail, Shield, ShieldOff, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Users, Mail, Shield, ShieldOff, ChevronLeft, ChevronRight, Copy, ChevronDown, ChevronUp, Check } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 20
 
@@ -10,6 +10,19 @@ interface Profile {
   id: string
   email: string
   full_name: string | null
+  first_name: string | null
+  last_name: string | null
+  company_name: string | null
+  address_line1: string | null
+  address_line2: string | null
+  address_line3: string | null
+  town_city: string | null
+  postcode: string | null
+  phone: string | null
+  mobile: string | null
+  instagram_handle: string | null
+  facebook_url: string | null
+  website_url: string | null
   role: string
   status: string
   created_at: string
@@ -22,6 +35,8 @@ export function UsersPage() {
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
   const [currentPage, setCurrentPage] = useState(1)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [copiedField, setCopiedField] = useState<string | null>(null)
 
   useEffect(() => {
     fetchUsers()
@@ -75,10 +90,52 @@ export function UsersPage() {
     }
   }
 
+  function getFormattedAddress(user: Profile): string {
+    const lines = [
+      [user.first_name, user.last_name].filter(Boolean).join(' '),
+      user.company_name,
+      user.address_line1,
+      user.address_line2,
+      user.address_line3,
+      [user.town_city, user.postcode].filter(Boolean).join(', '),
+    ].filter(Boolean)
+    return lines.join('\n')
+  }
+
+  function getAllContactDetails(user: Profile): string {
+    const lines = [
+      [user.first_name, user.last_name].filter(Boolean).join(' '),
+      user.company_name,
+      user.address_line1,
+      user.address_line2,
+      user.address_line3,
+      [user.town_city, user.postcode].filter(Boolean).join(', '),
+      '',
+      user.email,
+      user.phone ? `Phone: ${user.phone}` : null,
+      user.mobile ? `Mobile: ${user.mobile}` : null,
+      user.website_url ? `Web: ${user.website_url}` : null,
+      user.instagram_handle ? `Instagram: @${user.instagram_handle}` : null,
+      user.facebook_url ? `Facebook: ${user.facebook_url}` : null,
+    ].filter(line => line !== null)
+    return lines.join('\n')
+  }
+
+  function hasAddress(user: Profile): boolean {
+    return !!(user.address_line1 || user.town_city || user.postcode)
+  }
+
+  async function copyToClipboard(text: string, fieldId: string) {
+    await navigator.clipboard.writeText(text)
+    setCopiedField(fieldId)
+    setTimeout(() => setCopiedField(null), 2000)
+  }
+
   const filteredUsers = users.filter(u => {
     const matchesSearch = 
       (u.email?.toLowerCase() || '').includes(search.toLowerCase()) ||
-      (u.full_name?.toLowerCase() || '').includes(search.toLowerCase())
+      (u.full_name?.toLowerCase() || '').includes(search.toLowerCase()) ||
+      (u.company_name?.toLowerCase() || '').includes(search.toLowerCase())
     const matchesRole = roleFilter === 'all' || u.role === roleFilter
     return matchesSearch && matchesRole
   })
@@ -122,7 +179,7 @@ export function UsersPage() {
           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by name or email..."
+            placeholder="Search by name, email, or company..."
             className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -154,6 +211,9 @@ export function UsersPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-1">
                     <span className="font-medium text-gray-900">{user.full_name || 'Unnamed User'}</span>
+                    {user.company_name && (
+                      <span className="text-sm text-gray-500">({user.company_name})</span>
+                    )}
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                       user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
                     }`}>
@@ -172,6 +232,17 @@ export function UsersPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {hasAddress(user) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setExpandedId(expandedId === user.id ? null : user.id)}
+                      className="gap-1"
+                    >
+                      {expandedId === user.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      Details
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -189,6 +260,47 @@ export function UsersPage() {
                   </Button>
                 </div>
               </div>
+
+              {/* Expanded Details */}
+              {expandedId === user.id && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Address */}
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-gray-500 uppercase">Address (for labels)</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 gap-1 text-xs"
+                          onClick={() => copyToClipboard(getFormattedAddress(user), `addr-${user.id}`)}
+                        >
+                          {copiedField === `addr-${user.id}` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                          {copiedField === `addr-${user.id}` ? 'Copied' : 'Copy'}
+                        </Button>
+                      </div>
+                      <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans">{getFormattedAddress(user)}</pre>
+                    </div>
+
+                    {/* All Contact Details */}
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-gray-500 uppercase">All Contact Details</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 gap-1 text-xs"
+                          onClick={() => copyToClipboard(getAllContactDetails(user), `all-${user.id}`)}
+                        >
+                          {copiedField === `all-${user.id}` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                          {copiedField === `all-${user.id}` ? 'Copied' : 'Copy'}
+                        </Button>
+                      </div>
+                      <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans">{getAllContactDetails(user)}</pre>
+                    </div>
+                  </div>
+                </div>
+              )}
             </Card>
           ))}
 

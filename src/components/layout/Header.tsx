@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
-import { LogOut, Settings, Calculator, FileText } from 'lucide-react'
+import { LogOut, Settings, Calculator, FileText, User } from 'lucide-react'
 
 export function Header() {
   const { profile, signOut } = useAuth()
@@ -65,6 +65,11 @@ export function Header() {
                 <p className="text-sm font-medium text-gray-900">{profile?.full_name}</p>
                 <p className="text-xs text-gray-500">{profile?.company_name}</p>
               </div>
+              <Link to="/profile">
+                <Button variant="ghost" size="icon" title="Your profile">
+                  <User className="w-4 h-4" />
+                </Button>
+              </Link>
               <Button variant="ghost" size="icon" onClick={signOut} title="Sign out">
                 <LogOut className="w-4 h-4" />
               </Button>

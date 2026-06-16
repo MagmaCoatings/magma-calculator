@@ -7,6 +7,7 @@ import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import { CalculatorPage } from '@/pages/CalculatorPage'
 import { QuotesPage } from '@/pages/QuotesPage'
 import { QuoteDetailPage } from '@/pages/QuoteDetailPage'
+import { ProfilePage } from '@/pages/ProfilePage'
 import { AdminLayout } from '@/components/layout/AdminLayout'
 import { AdminDashboard as Dashboard } from '@/pages/admin/Dashboard'
 import { ProductsPage } from '@/pages/admin/Products'
@@ -104,6 +105,13 @@ function AppRoutes() {
         <ProtectedRoute>
           <Header />
           <QuoteDetailPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/profile" element={
+        <ProtectedRoute>
+          <Header />
+          <ProfilePage />
         </ProtectedRoute>
       } />
       
