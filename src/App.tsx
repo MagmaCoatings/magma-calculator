@@ -12,6 +12,7 @@ import { AdminDashboard as Dashboard } from '@/pages/admin/Dashboard'
 import { ProductsPage } from '@/pages/admin/Products'
 import { UsersPage } from '@/pages/admin/Users'
 import { LoginLogsPage } from '@/pages/admin/LoginLogs'
+import { ActivityLogPage } from '@/pages/admin/ActivityLogPage'
 import { SystemsPage } from '@/pages/admin/SystemsPage'
 import { StagesPage } from '@/pages/admin/StagesPage'
 import { SettingsPage } from '@/pages/admin/SettingsPage'
@@ -151,6 +152,14 @@ function AppRoutes() {
         <AdminRoute>
           <AdminLayout>
             <LoginLogsPage />
+          </AdminLayout>
+        </AdminRoute>
+      } />
+      
+      <Route path="/admin/activity" element={
+        <AdminRoute>
+          <AdminLayout>
+            <ActivityLogPage />
           </AdminLayout>
         </AdminRoute>
       } />

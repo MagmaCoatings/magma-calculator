@@ -1,29 +1,35 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { formatDateTime } from '@/lib/formatters'
-import type { Profile } from '@/lib/types'
-import { Plus, Search, Shield, User, Ban, CheckCircle } from 'lucide-react'
+import { Users, Mail, Shield, ShieldOff, ChevronLeft, ChevronRight } from 'lucide-react'
+
+const ITEMS_PER_PAGE = 20
+
+interface Profile {
+  id: string
+  email: string
+  full_name: string | null
+  role: string
+  status: string
+  created_at: string
+  last_login: string | null
+}
 
 export function UsersPage() {
   const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [newUser, setNewUser] = useState({
-    email: '',
-    password: '',
-    full_name: '',
-    company_name: '',
-    role: 'installer' as 'admin' | 'installer',
-  })
-  const [adding, setAdding] = useState(false)
+  const [roleFilter, setRoleFilter] = useState<string>('all')
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     fetchUsers()
   }, [])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, roleFilter])
 
   async function fetchUsers() {
     const { data, error } = await supabase
@@ -39,102 +45,59 @@ export function UsersPage() {
     setLoading(false)
   }
 
-  async function addUser() {
-    if (!newUser.email || !newUser.password || !newUser.full_name) {
-      alert('Please fill in email, password, and full name')
-      return
-    }
-
-    setAdding(true)
-
-    // Create auth user
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email: newUser.email,
-      password: newUser.password,
-      email_confirm: true,
-    })
-
-    if (authError) {
-      // Try signup instead (admin API might not be available)
-      const { data: signupData, error: signupError } = await supabase.auth.signUp({
-        email: newUser.email,
-        password: newUser.password,
-      })
-
-      if (signupError) {
-        alert('Error creating user: ' + signupError.message)
-        setAdding(false)
-        return
-      }
-
-      // Update profile
-      if (signupData.user) {
-        await supabase
-          .from('profiles')
-          .update({
-            full_name: newUser.full_name,
-            company_name: newUser.company_name,
-            role: newUser.role,
-            status: 'active',
-          })
-          .eq('id', signupData.user.id)
-      }
-    } else if (authData.user) {
-      // Update profile
-      await supabase
-        .from('profiles')
-        .update({
-          full_name: newUser.full_name,
-          company_name: newUser.company_name,
-          role: newUser.role,
-          status: 'active',
-        })
-        .eq('id', authData.user.id)
-    }
-
-    await fetchUsers()
-    setShowAddForm(false)
-    setNewUser({
-      email: '',
-      password: '',
-      full_name: '',
-      company_name: '',
-      role: 'installer',
-    })
-    setAdding(false)
-  }
-
-  async function updateStatus(id: string, status: 'active' | 'suspended') {
+  async function toggleRole(userId: string, currentRole: string) {
+    const newRole = currentRole === 'admin' ? 'user' : 'admin'
     const { error } = await supabase
       .from('profiles')
-      .update({ status })
-      .eq('id', id)
+      .update({ role: newRole })
+      .eq('id', userId)
 
     if (error) {
-      alert('Error updating user: ' + error.message)
+      console.error('Error updating role:', error)
+      alert('Failed to update role')
     } else {
-      setUsers(users.map(u => u.id === id ? { ...u, status } : u))
+      fetchUsers()
     }
   }
 
-  async function updateRole(id: string, role: 'admin' | 'installer') {
+  async function toggleStatus(userId: string, currentStatus: string) {
+    const newStatus = currentStatus === 'active' ? 'suspended' : 'active'
     const { error } = await supabase
       .from('profiles')
-      .update({ role })
-      .eq('id', id)
+      .update({ status: newStatus })
+      .eq('id', userId)
 
     if (error) {
-      alert('Error updating user: ' + error.message)
+      console.error('Error updating status:', error)
+      alert('Failed to update status')
     } else {
-      setUsers(users.map(u => u.id === id ? { ...u, role } : u))
+      fetchUsers()
     }
   }
 
-  const filteredUsers = users.filter(u =>
-    u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-    u.email?.toLowerCase().includes(search.toLowerCase()) ||
-    u.company_name?.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = 
+      (u.email?.toLowerCase() || '').includes(search.toLowerCase()) ||
+      (u.full_name?.toLowerCase() || '').includes(search.toLowerCase())
+    const matchesRole = roleFilter === 'all' || u.role === roleFilter
+    return matchesSearch && matchesRole
+  })
+
+  const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedUsers = filteredUsers.slice(startIndex, endIndex)
+
+  function formatDate(dateStr: string | null) {
+    if (!dateStr) return 'Never'
+    return new Date(dateStr).toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
 
   if (loading) {
     return (
@@ -145,166 +108,123 @@ export function UsersPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Users</h1>
-        <Button onClick={() => setShowAddForm(true)} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Add User
-        </Button>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Users</h1>
+          <p className="text-gray-500 text-sm mt-1">{users.length} total users</p>
+        </div>
       </div>
 
-      {/* Add User Form */}
-      {showAddForm && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Add New User</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Input
-                label="Email"
-                type="email"
-                placeholder="installer@company.com"
-                value={newUser.email}
-                onChange={e => setNewUser({ ...newUser, email: e.target.value })}
-              />
-              <Input
-                label="Password"
-                type="password"
-                placeholder="••••••••"
-                value={newUser.password}
-                onChange={e => setNewUser({ ...newUser, password: e.target.value })}
-              />
-              <Input
-                label="Full Name"
-                placeholder="John Smith"
-                value={newUser.full_name}
-                onChange={e => setNewUser({ ...newUser, full_name: e.target.value })}
-              />
-              <Input
-                label="Company Name"
-                placeholder="ABC Flooring Ltd"
-                value={newUser.company_name}
-                onChange={e => setNewUser({ ...newUser, company_name: e.target.value })}
-              />
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                <select
-                  className="w-full h-10 px-3 rounded-lg border border-gray-200"
-                  value={newUser.role}
-                  onChange={e => setNewUser({ ...newUser, role: e.target.value as 'admin' | 'installer' })}
+      {/* Filters */}
+      <div className="flex gap-4 mb-6">
+        <div className="relative flex-1">
+          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by name or email..."
+            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <select
+          className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm"
+          value={roleFilter}
+          onChange={e => setRoleFilter(e.target.value)}
+        >
+          <option value="all">All Roles</option>
+          <option value="admin">Admins</option>
+          <option value="user">Users</option>
+        </select>
+      </div>
+
+      {/* Users List */}
+      {filteredUsers.length === 0 ? (
+        <Card className="p-12 text-center">
+          <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
+          <p className="text-gray-500">Try adjusting your search or filters</p>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {paginatedUsers.map(user => (
+            <Card key={user.id} className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="font-medium text-gray-900">{user.full_name || 'Unnamed User'}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {user.role}
+                    </span>
+                    {user.status === 'suspended' && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                        Suspended
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500">{user.email}</p>
+                  <div className="flex gap-4 text-xs text-gray-400 mt-2">
+                    <span>Joined: {formatDate(user.created_at)}</span>
+                    <span>Last login: {formatDate(user.last_login)}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleRole(user.id, user.role)}
+                    title={user.role === 'admin' ? 'Demote to user' : 'Promote to admin'}
+                  >
+                    {user.role === 'admin' ? <ShieldOff className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+                  </Button>
+                  <Button
+                    variant={user.status === 'active' ? 'outline' : 'destructive'}
+                    size="sm"
+                    onClick={() => toggleStatus(user.id, user.status)}
+                  >
+                    {user.status === 'active' ? 'Suspend' : 'Activate'}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4 border-t">
+              <p className="text-sm text-gray-500">
+                Showing {startIndex + 1}-{Math.min(endIndex, filteredUsers.length)} of {filteredUsers.length} users
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
                 >
-                  <option value="installer">Installer</option>
-                  <option value="admin">Admin</option>
-                </select>
+                  <ChevronLeft className="w-4 h-4" />
+                  Previous
+                </Button>
+                <span className="px-3 py-1 text-sm text-gray-600">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
               </div>
             </div>
-            <div className="flex gap-2 mt-4">
-              <Button onClick={addUser} disabled={adding}>
-                {adding ? 'Creating...' : 'Create User'}
-              </Button>
-              <Button variant="outline" onClick={() => setShowAddForm(false)}>Cancel</Button>
-            </div>
-            <p className="text-sm text-gray-500 mt-3">
-              Note: The user will need to confirm their email before they can log in.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Search */}
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search users..."
-          className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-      </div>
-
-      {/* Users Table */}
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredUsers.map(user => (
-                <tr key={user.id} className={user.status === 'suspended' ? 'bg-red-50 opacity-70' : ''}>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        user.role === 'admin' ? 'bg-magma text-white' : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {user.role === 'admin' ? <Shield className="w-4 h-4" /> : <User className="w-4 h-4" />}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{user.full_name || 'Unnamed'}</p>
-                        <p className="text-sm text-gray-500">{user.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{user.company_name || '-'}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <select
-                      className="px-2 py-1 rounded border border-gray-200 text-sm"
-                      value={user.role}
-                      onChange={e => updateRole(user.id, e.target.value as 'admin' | 'installer')}
-                    >
-                      <option value="installer">Installer</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      user.status === 'active'
-                        ? 'bg-green-100 text-green-700'
-                        : user.status === 'suspended'
-                        ? 'bg-red-100 text-red-700'
-                        : 'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {user.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {formatDateTime(user.created_at)}
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    {user.status === 'active' ? (
-                      <button
-                        onClick={() => updateStatus(user.id, 'suspended')}
-                        className="flex items-center gap-1 px-2 py-1 text-red-600 hover:bg-red-50 rounded text-xs"
-                      >
-                        <Ban className="w-3 h-3" />
-                        Suspend
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => updateStatus(user.id, 'active')}
-                        className="flex items-center gap-1 px-2 py-1 text-green-600 hover:bg-green-50 rounded text-xs"
-                      >
-                        <CheckCircle className="w-3 h-3" />
-                        Activate
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          )}
         </div>
-      </Card>
+      )}
     </div>
   )
 }

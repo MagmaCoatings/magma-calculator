@@ -1,80 +1,105 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Plus, GripVertical, Pencil, Trash2, Check, X } from 'lucide-react'
+import { Layers, Plus, Pencil, Trash2, GripVertical } from 'lucide-react'
 
 interface Stage {
   id: string
   name: string
   display_order: number
-  is_active: boolean
+  description: string | null
+  created_at: string
 }
 
 export function StagesPage() {
   const [stages, setStages] = useState<Stage[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editName, setEditName] = useState('')
-  const [newStageName, setNewStageName] = useState('')
-  const [showAdd, setShowAdd] = useState(false)
+  const [editForm, setEditForm] = useState({ name: '', description: '' })
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newStage, setNewStage] = useState({ name: '', description: '' })
 
   useEffect(() => {
     fetchStages()
   }, [])
 
   async function fetchStages() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('stages')
       .select('*')
-      .order('display_order')
-    setStages(data || [])
+      .order('display_order', { ascending: true })
+
+    if (error) {
+      console.error('Error fetching stages:', error)
+    } else {
+      setStages(data || [])
+    }
     setLoading(false)
   }
 
   async function addStage() {
-    if (!newStageName.trim()) return
+    if (!newStage.name.trim()) return
 
-    const maxOrder = Math.max(...stages.map(s => s.display_order), 0)
-    await supabase.from('stages').insert({
-      name: newStageName.trim(),
-      display_order: maxOrder + 1,
-    })
-    setNewStageName('')
-    setShowAdd(false)
-    fetchStages()
+    const maxOrder = stages.length > 0 ? Math.max(...stages.map(s => s.display_order)) : 0
+
+    const { error } = await supabase
+      .from('stages')
+      .insert({
+        name: newStage.name.trim(),
+        description: newStage.description.trim() || null,
+        display_order: maxOrder + 1
+      })
+
+    if (error) {
+      console.error('Error adding stage:', error)
+      alert('Failed to add stage')
+    } else {
+      setNewStage({ name: '', description: '' })
+      setShowAddForm(false)
+      fetchStages()
+    }
   }
 
   async function updateStage(id: string) {
-    if (!editName.trim()) return
+    if (!editForm.name.trim()) return
 
-    await supabase
+    const { error } = await supabase
       .from('stages')
-      .update({ name: editName.trim() })
+      .update({
+        name: editForm.name.trim(),
+        description: editForm.description.trim() || null
+      })
       .eq('id', id)
-    setEditingId(null)
-    fetchStages()
+
+    if (error) {
+      console.error('Error updating stage:', error)
+      alert('Failed to update stage')
+    } else {
+      setEditingId(null)
+      fetchStages()
+    }
   }
 
   async function deleteStage(id: string) {
-    if (!confirm('Delete this stage? Products using it will have no stage assigned.')) return
-    await supabase.from('stages').delete().eq('id', id)
-    fetchStages()
+    if (!confirm('Are you sure you want to delete this stage? This may affect system configurations.')) return
+
+    const { error } = await supabase
+      .from('stages')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error('Error deleting stage:', error)
+      alert('Failed to delete stage. It may be in use.')
+    } else {
+      fetchStages()
+    }
   }
 
-  async function moveStage(id: string, direction: 'up' | 'down') {
-    const index = stages.findIndex(s => s.id === id)
-    if (direction === 'up' && index === 0) return
-    if (direction === 'down' && index === stages.length - 1) return
-
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    const current = stages[index]
-    const swap = stages[swapIndex]
-
-    await supabase.from('stages').update({ display_order: swap.display_order }).eq('id', current.id)
-    await supabase.from('stages').update({ display_order: current.display_order }).eq('id', swap.id)
-    fetchStages()
+  function startEditing(stage: Stage) {
+    setEditingId(stage.id)
+    setEditForm({ name: stage.name, description: stage.description || '' })
   }
 
   if (loading) {
@@ -86,113 +111,108 @@ export function StagesPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Stages</h1>
-          <p className="text-gray-500 text-sm">Define the stages/layers for system build-ups</p>
+          <h1 className="text-2xl font-bold text-gray-900">Application Stages</h1>
+          <p className="text-gray-500 text-sm mt-1">{stages.length} stages defined</p>
         </div>
-        <Button onClick={() => setShowAdd(true)} disabled={showAdd}>
-          <Plus className="w-4 h-4 mr-2" /> Add Stage
+        <Button onClick={() => setShowAddForm(true)} className="gap-2">
+          <Plus className="w-4 h-4" />
+          Add Stage
         </Button>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {showAdd && (
-            <div className="flex items-center gap-2 p-4 bg-orange-50 border-b border-orange-100">
-              <Input
-                placeholder="Stage name (e.g., Base Coats)"
-                value={newStageName}
-                onChange={e => setNewStageName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addStage()}
-                autoFocus
-                className="flex-1"
-              />
-              <Button size="sm" onClick={addStage}>
-                <Check className="w-4 h-4" />
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => { setShowAdd(false); setNewStageName('') }}>
-                <X className="w-4 h-4" />
-              </Button>
+      {/* Add Form */}
+      {showAddForm && (
+        <Card className="p-4 mb-6 border-2 border-dashed border-magma">
+          <h3 className="font-medium text-gray-900 mb-3">New Stage</h3>
+          <div className="space-y-3">
+            <input
+              type="text"
+              placeholder="Stage name (e.g., Primer, Base Coat, Seal)"
+              className="w-full px-3 py-2 rounded-lg border border-gray-200"
+              value={newStage.name}
+              onChange={e => setNewStage({ ...newStage, name: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Description (optional)"
+              className="w-full px-3 py-2 rounded-lg border border-gray-200"
+              value={newStage.description}
+              onChange={e => setNewStage({ ...newStage, description: e.target.value })}
+            />
+            <div className="flex gap-2">
+              <Button onClick={addStage}>Add Stage</Button>
+              <Button variant="outline" onClick={() => setShowAddForm(false)}>Cancel</Button>
             </div>
-          )}
+          </div>
+        </Card>
+      )}
 
-          {stages.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              No stages defined yet. Add your first stage to get started.
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {stages.map((stage, index) => (
-                <div key={stage.id} className="flex items-center gap-3 p-4 hover:bg-gray-50">
-                  <div className="flex flex-col gap-1">
-                    <button
-                      onClick={() => moveStage(stage.id, 'up')}
-                      disabled={index === 0}
-                      className="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30"
-                    >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => moveStage(stage.id, 'down')}
-                      disabled={index === stages.length - 1}
-                      className="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30"
-                    >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
+      {/* Stages List */}
+      {stages.length === 0 ? (
+        <Card className="p-12 text-center">
+          <Layers className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No stages defined</h3>
+          <p className="text-gray-500 mb-4">Stages define the order of product application</p>
+          <Button onClick={() => setShowAddForm(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add First Stage
+          </Button>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {stages.map((stage, index) => (
+            <Card key={stage.id} className="p-4">
+              {editingId === stage.id ? (
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200"
+                    value={editForm.name}
+                    onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Description (optional)"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200"
+                    value={editForm.description}
+                    onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                  />
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => updateStage(stage.id)}>Save</Button>
+                    <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>Cancel</Button>
                   </div>
-
-                  <GripVertical className="w-4 h-4 text-gray-300" />
-
-                  <div className="flex-1">
-                    {editingId === stage.id ? (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          value={editName}
-                          onChange={e => setEditName(e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && updateStage(stage.id)}
-                          autoFocus
-                          className="max-w-xs"
-                        />
-                        <Button size="sm" onClick={() => updateStage(stage.id)}>
-                          <Check className="w-4 h-4" />
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <span className="font-medium text-gray-900">{stage.name}</span>
-                    )}
-                  </div>
-
-                  {editingId !== stage.id && (
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => { setEditingId(stage.id); setEditName(stage.name) }}
-                        className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => deleteStage(stage.id)}
-                        className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <GripVertical className="w-4 h-4 text-gray-400" />
+                    <div className="w-8 h-8 rounded-full bg-magma/10 flex items-center justify-center text-sm font-bold text-magma">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{stage.name}</p>
+                      {stage.description && (
+                        <p className="text-sm text-gray-500">{stage.description}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => startEditing(stage)}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => deleteStage(stage.id)}>
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

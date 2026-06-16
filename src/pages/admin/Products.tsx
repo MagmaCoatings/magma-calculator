@@ -227,7 +227,7 @@ export function ProductsPage() {
         category: cat,
         products: filteredProducts.filter(p => p.category_id === cat.id),
       })).concat([{
-        category: { id: '', name: 'Uncategorized', display_order: 999 },
+        category: { id: '', name: 'Uncategorized', display_order: 999, created_at: '' },
         products: filteredProducts.filter(p => !p.category_id),
       }]).filter(g => g.products.length > 0)
     : [{ category: null, products: filteredProducts }]

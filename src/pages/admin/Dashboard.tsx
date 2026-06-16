@@ -1,26 +1,22 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Users, Package, LogIn, AlertTriangle, FileText, ChevronRight } from 'lucide-react'
+import { Card } from '@/components/ui/card'
+import { FileText, Users, Package, Activity } from 'lucide-react'
 
-interface Stats {
-  totalUsers: number
-  activeUsers: number
-  totalProducts: number
+interface DashboardStats {
   totalQuotes: number
+  totalUsers: number
+  totalProducts: number
   recentLogins: number
-  suspiciousLogins: number
 }
 
 export function AdminDashboard() {
-  const [stats, setStats] = useState<Stats>({
-    totalUsers: 0,
-    activeUsers: 0,
-    totalProducts: 0,
+  const [stats, setStats] = useState<DashboardStats>({
     totalQuotes: 0,
-    recentLogins: 0,
-    suspiciousLogins: 0,
+    totalUsers: 0,
+    totalProducts: 0,
+    recentLogins: 0
   })
   const [loading, setLoading] = useState(true)
 
@@ -29,52 +25,29 @@ export function AdminDashboard() {
   }, [])
 
   async function fetchStats() {
-    // Fetch users count
-    const { count: totalUsers } = await supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-
-    const { count: activeUsers } = await supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_active', true)
-
-    // Fetch products count
-    const { count: totalProducts } = await supabase
-      .from('products')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_active', true)
-
-    // Fetch quotes count
-    const { count: totalQuotes } = await supabase
-      .from('quotes')
-      .select('*', { count: 'exact', head: true })
-
-    // Fetch recent logins (last 7 days)
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-
-    const { count: recentLogins } = await supabase
-      .from('login_logs')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', sevenDaysAgo.toISOString())
-
-    const { count: suspiciousLogins } = await supabase
-      .from('login_logs')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_suspicious', true)
-      .gte('created_at', sevenDaysAgo.toISOString())
+    const [quotesRes, usersRes, productsRes, loginsRes] = await Promise.all([
+      supabase.from('quotes').select('id', { count: 'exact', head: true }),
+      supabase.from('profiles').select('id', { count: 'exact', head: true }),
+      supabase.from('products').select('id', { count: 'exact', head: true }),
+      supabase.from('login_logs').select('id', { count: 'exact', head: true })
+        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+    ])
 
     setStats({
-      totalUsers: totalUsers || 0,
-      activeUsers: activeUsers || 0,
-      totalProducts: totalProducts || 0,
-      totalQuotes: totalQuotes || 0,
-      recentLogins: recentLogins || 0,
-      suspiciousLogins: suspiciousLogins || 0,
+      totalQuotes: quotesRes.count || 0,
+      totalUsers: usersRes.count || 0,
+      totalProducts: productsRes.count || 0,
+      recentLogins: loginsRes.count || 0
     })
     setLoading(false)
   }
+
+  const statCards = [
+    { label: 'Total Quotes', value: stats.totalQuotes, icon: FileText, href: '/quotes', color: 'text-blue-600 bg-blue-100' },
+    { label: 'Users', value: stats.totalUsers, icon: Users, href: '/admin/users', color: 'text-green-600 bg-green-100' },
+    { label: 'Products', value: stats.totalProducts, icon: Package, href: '/admin/products', color: 'text-purple-600 bg-purple-100' },
+    { label: 'Logins (7d)', value: stats.recentLogins, icon: Activity, href: '/admin/logs', color: 'text-orange-600 bg-orange-100' },
+  ]
 
   if (loading) {
     return (
@@ -85,154 +58,28 @@ export function AdminDashboard() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
-
-      {/* Stats Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Total Users</p>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalUsers}</p>
-                <p className="text-xs text-gray-400">{stats.activeUsers} active</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <Users className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Products</p>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalProducts}</p>
-                <p className="text-xs text-gray-400">active items</p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                <Package className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Quotes</p>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalQuotes}</p>
-                <p className="text-xs text-gray-400">total created</p>
-              </div>
-              <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
-                <FileText className="w-6 h-6 text-orange-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Logins (7 days)</p>
-                <p className="text-3xl font-bold text-gray-900">{stats.recentLogins}</p>
-                <p className="text-xs text-gray-400">recent sessions</p>
-              </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                <LogIn className="w-6 h-6 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+    <div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <p className="text-gray-500 text-sm mt-1">System overview</p>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Quick Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Link to="/admin/users" className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition">
-              <div>
-                <p className="font-medium">Manage Users</p>
-                <p className="text-sm text-gray-500">Add installers, change roles, suspend accounts</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400" />
-            </Link>
-            <Link to="/admin/products" className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition">
-              <div>
-                <p className="font-medium">Manage Products</p>
-                <p className="text-sm text-gray-500">Update prices, add new products</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400" />
-            </Link>
-            <Link to="/admin/logs" className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition">
-              <div>
-                <p className="font-medium">View Login Logs</p>
-                <p className="text-sm text-gray-500">See who logged in and from where</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400" />
-            </Link>
-            <Link to="/admin/systems" className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition">
-              <div>
-                <p className="font-medium">Manage Systems</p>
-                <p className="text-sm text-gray-500">Create and edit product systems</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400" />
-            </Link>
-            <Link to="/admin/stages" className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition">
-              <div>
-                <p className="font-medium">Manage Stages</p>
-                <p className="text-sm text-gray-500">DPM, Primer, Base Coat, etc.</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400" />
-            </Link>
-            <Link to="/quotes" className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition">
-              <div>
-                <p className="font-medium">View All Quotes</p>
-                <p className="text-sm text-gray-500">See quotes from all installers</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400" />
-            </Link>
-          </CardContent>
-        </Card>
-
-        {/* Alerts */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Alerts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {stats.suspiciousLogins > 0 ? (
-              <div className="flex items-start gap-3 p-3 bg-red-50 rounded-lg border border-red-100">
-                <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
-                <div>
-                  <p className="font-medium text-red-800">Suspicious Logins Detected</p>
-                  <p className="text-sm text-red-600">{stats.suspiciousLogins} suspicious login attempts in the last 7 days</p>
-                  <Link to="/admin/logs" className="text-sm text-red-700 underline mt-1 inline-block">
-                    View details →
-                  </Link>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
-                <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center mt-0.5">
-                  <span className="text-white text-xs">✓</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {statCards.map(stat => (
+          <Link key={stat.label} to={stat.href}>
+            <Card className="p-6 hover:shadow-md transition-shadow cursor-pointer">
+              <div className="flex items-center gap-4">
+                <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${stat.color}`}>
+                  <stat.icon className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="font-medium text-green-800">All Clear</p>
-                  <p className="text-sm text-green-600">No suspicious activity detected</p>
+                  <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                  <p className="text-sm text-gray-500">{stat.label}</p>
                 </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </Card>
+          </Link>
+        ))}
       </div>
     </div>
   )

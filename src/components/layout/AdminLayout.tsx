@@ -8,7 +8,9 @@ import {
   Layers, 
   Settings,
   LogOut,
-  Calculator
+  Calculator,
+  Activity,
+  LogIn
 } from 'lucide-react'
 
 interface AdminLayoutProps {
@@ -21,7 +23,8 @@ const navItems = [
   { path: '/admin/systems', label: 'Systems', icon: Layers },
   { path: '/admin/stages', label: 'Stages', icon: FileText },
   { path: '/admin/users', label: 'Users', icon: Users },
-  { path: '/admin/logs', label: 'Login Logs', icon: FileText },
+  { path: '/admin/logs', label: 'Login Logs', icon: LogIn },
+  { path: '/admin/activity', label: 'Activity Log', icon: Activity },
   { path: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 

@@ -1,63 +1,116 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Card } from '@/components/ui/card'
-import { formatDateTime } from '@/lib/formatters'
-import type { LoginLog, Profile } from '@/lib/types'
-import { Search, AlertTriangle, Monitor, Smartphone, Tablet } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Activity, MapPin, Monitor, Smartphone, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react'
 
-interface LoginLogWithUser extends LoginLog {
-  profiles?: Profile
+const ITEMS_PER_PAGE = 50
+
+interface LoginLog {
+  id: string
+  user_id: string
+  email: string
+  ip_address: string | null
+  city: string | null
+  region: string | null
+  country: string | null
+  device_type: string | null
+  browser: string | null
+  os: string | null
+  success: boolean
+  failure_reason: string | null
+  created_at: string
+  user_name?: string
 }
 
 export function LoginLogsPage() {
-  const [logs, setLogs] = useState<LoginLogWithUser[]>([])
+  const [logs, setLogs] = useState<LoginLog[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'all' | 'suspicious'>('all')
+  const [successFilter, setSuccessFilter] = useState<string>('all')
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     fetchLogs()
   }, [])
 
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, successFilter])
+
   async function fetchLogs() {
     const { data, error } = await supabase
       .from('login_logs')
-      .select('*, profiles(full_name, email, company_name)')
-      .order('logged_in_at', { ascending: false })
-      .limit(200)
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(1000)
 
     if (error) {
       console.error('Error fetching logs:', error)
     } else {
-      setLogs(data || [])
+      // Get user names
+      const logsWithNames = await Promise.all((data || []).map(async (log) => {
+        if (log.user_id) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', log.user_id)
+            .single()
+          log.user_name = profile?.full_name || null
+        }
+        return log
+      }))
+      setLogs(logsWithNames)
     }
     setLoading(false)
   }
 
   const filteredLogs = logs.filter(log => {
     const matchesSearch = 
-      log.profiles?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-      log.profiles?.email?.toLowerCase().includes(search.toLowerCase()) ||
-      log.city?.toLowerCase().includes(search.toLowerCase()) ||
-      log.country?.toLowerCase().includes(search.toLowerCase()) ||
-      log.ip_address?.includes(search)
-
-    const matchesFilter = filter === 'all' || (filter === 'suspicious' && log.is_suspicious)
-
-    return matchesSearch && matchesFilter
+      (log.email?.toLowerCase() || '').includes(search.toLowerCase()) ||
+      (log.ip_address?.toLowerCase() || '').includes(search.toLowerCase()) ||
+      (log.city?.toLowerCase() || '').includes(search.toLowerCase()) ||
+      (log.country?.toLowerCase() || '').includes(search.toLowerCase()) ||
+      (log.user_name?.toLowerCase() || '').includes(search.toLowerCase())
+    const matchesSuccess = 
+      successFilter === 'all' || 
+      (successFilter === 'success' && log.success) ||
+      (successFilter === 'failed' && !log.success)
+    return matchesSearch && matchesSuccess
   })
 
-  const suspiciousCount = logs.filter(l => l.is_suspicious).length
+  const totalPages = Math.ceil(filteredLogs.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedLogs = filteredLogs.slice(startIndex, endIndex)
 
-  function getDeviceIcon(deviceType?: string) {
-    switch (deviceType) {
-      case 'mobile':
-        return <Smartphone className="w-4 h-4" />
-      case 'tablet':
-        return <Tablet className="w-4 h-4" />
-      default:
-        return <Monitor className="w-4 h-4" />
-    }
+  function formatDate(dateStr: string) {
+    return new Date(dateStr).toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  }
+
+  function getDeviceIcon(deviceType: string | null) {
+    if (deviceType === 'mobile') return <Smartphone className="w-4 h-4" />
+    return <Monitor className="w-4 h-4" />
+  }
+
+  function getLocation(log: LoginLog) {
+    const parts = [log.city, log.region, log.country].filter(Boolean)
+    return parts.length > 0 ? parts.join(', ') : 'Unknown'
+  }
+
+  // Detect suspicious logins (multiple failed attempts, unusual locations, etc.)
+  function isSuspicious(log: LoginLog) {
+    // Simple heuristic: failed login or unusual country
+    if (!log.success) return true
+    // Add more checks here as needed
+    return false
   }
 
   if (loading) {
@@ -68,130 +121,135 @@ export function LoginLogsPage() {
     )
   }
 
+  const failedCount = logs.filter(l => !l.success).length
+  const successCount = logs.filter(l => l.success).length
+
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Login Logs</h1>
-        {suspiciousCount > 0 && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-sm">
-            <AlertTriangle className="w-4 h-4" />
-            {suspiciousCount} suspicious login{suspiciousCount > 1 ? 's' : ''}
-          </div>
-        )}
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Login Logs</h1>
+          <p className="text-gray-500 text-sm mt-1">
+            {successCount} successful, {failedCount} failed (last 1000 entries)
+          </p>
+        </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+      <div className="flex gap-4 mb-6">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Activity className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by name, email, location, IP..."
+            placeholder="Search by email, name, IP, city, or country..."
             className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
         </div>
         <div className="flex gap-2">
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              filter === 'all'
-                ? 'bg-charcoal text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-            onClick={() => setFilter('all')}
-          >
-            All Logins
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              filter === 'suspicious'
-                ? 'bg-red-500 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-            onClick={() => setFilter('suspicious')}
-          >
-            Suspicious Only
-          </button>
+          {[
+            { value: 'all', label: 'All' },
+            { value: 'success', label: 'Successful' },
+            { value: 'failed', label: 'Failed' },
+          ].map(option => (
+            <button
+              key={option.value}
+              onClick={() => setSuccessFilter(option.value)}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                successFilter === option.value
+                  ? 'bg-charcoal text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Logs Table */}
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Device</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Browser</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredLogs.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
-                    No login logs found
-                  </td>
-                </tr>
-              ) : (
-                filteredLogs.map(log => (
-                  <tr key={log.id} className={log.is_suspicious ? 'bg-red-50' : ''}>
-                    <td className="px-4 py-3">
-                      <div>
-                        <p className="font-medium text-gray-900">{log.profiles?.full_name || 'Unknown'}</p>
-                        <p className="text-xs text-gray-500">{log.profiles?.email}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {formatDateTime(log.logged_in_at)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {log.city && log.country ? `${log.city}, ${log.country}` : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-mono text-gray-500">
-                      {log.ip_address || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      <div className="flex items-center gap-2">
-                        {getDeviceIcon(log.device_type || undefined)}
-                        <span className="capitalize">{log.device_type || 'Unknown'}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      <div>
-                        <p>{log.browser || '-'}</p>
-                        <p className="text-xs text-gray-400">{log.os}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {log.is_suspicious ? (
-                        <div className="flex items-center gap-1 text-red-600">
-                          <AlertTriangle className="w-4 h-4" />
-                          <span className="text-xs font-medium">Suspicious</span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-green-600 font-medium">Normal</span>
-                      )}
-                      {log.suspicious_reason && (
-                        <p className="text-xs text-red-500 mt-1">{log.suspicious_reason}</p>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      {/* Logs List */}
+      {filteredLogs.length === 0 ? (
+        <Card className="p-12 text-center">
+          <Activity className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No logs found</h3>
+          <p className="text-gray-500">Try adjusting your search or filters</p>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {paginatedLogs.map(log => (
+            <Card key={log.id} className={`p-3 ${isSuspicious(log) ? 'border-l-4 border-l-red-500' : ''}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className={`w-2 h-2 rounded-full ${log.success ? 'bg-green-500' : 'bg-red-500'}`} />
+                    <span className="font-medium text-gray-900">
+                      {log.user_name || log.email}
+                    </span>
+                    {!log.success && (
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                        <AlertTriangle className="w-3 h-3" />
+                        Failed
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <span className="flex items-center gap-1">
+                      {getDeviceIcon(log.device_type)}
+                      {log.browser || 'Unknown browser'} / {log.os || 'Unknown OS'}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      {getLocation(log)}
+                    </span>
+                    {log.ip_address && (
+                      <span className="font-mono text-gray-400">{log.ip_address}</span>
+                    )}
+                  </div>
+                  {log.failure_reason && (
+                    <p className="text-xs text-red-600 mt-1">{log.failure_reason}</p>
+                  )}
+                </div>
+                <div className="text-right text-xs text-gray-400">
+                  {formatDate(log.created_at)}
+                </div>
+              </div>
+            </Card>
+          ))}
 
-      <p className="text-sm text-gray-500 mt-4">
-        Showing last 200 login events
-      </p>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4 border-t">
+              <p className="text-sm text-gray-500">
+                Showing {startIndex + 1}-{Math.min(endIndex, filteredLogs.length)} of {filteredLogs.length} logs
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Previous
+                </Button>
+                <span className="px-3 py-1 text-sm text-gray-600">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

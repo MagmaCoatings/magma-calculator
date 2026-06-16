@@ -5,7 +5,9 @@ import { useAuth } from '@/hooks/useAuth'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/formatters'
-import { Search, Plus, FileText, Clock, CheckCircle, XCircle, ChevronRight, User } from 'lucide-react'
+import { Search, Plus, FileText, Clock, CheckCircle, XCircle, ChevronRight, ChevronLeft, User } from 'lucide-react'
+
+const ITEMS_PER_PAGE = 20
 
 interface Quote {
   id: string
@@ -33,6 +35,7 @@ export function QuotesPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [creatorFilter, setCreatorFilter] = useState<string>('all')
   const [creators, setCreators] = useState<{id: string, name: string}[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
   const navigate = useNavigate()
   const { profile } = useAuth()
 
@@ -88,6 +91,17 @@ export function QuotesPage() {
     
     return matchesSearch && matchesStatus && matchesCreator
   })
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, statusFilter, creatorFilter])
+
+  // Pagination
+  const totalPages = Math.ceil(filteredQuotes.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedQuotes = filteredQuotes.slice(startIndex, endIndex)
 
   const statusCounts = {
     all: quotes.length,
@@ -200,7 +214,7 @@ export function QuotesPage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {filteredQuotes.map(quote => (
+          {paginatedQuotes.map(quote => (
             <Link
               key={quote.id}
               to={`/quotes/${quote.id}`}
@@ -262,6 +276,38 @@ export function QuotesPage() {
               </Card>
             </Link>
           ))}
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4 border-t">
+              <p className="text-sm text-gray-500">
+                Showing {startIndex + 1}-{Math.min(endIndex, filteredQuotes.length)} of {filteredQuotes.length} quotes
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Previous
+                </Button>
+                <span className="px-3 py-1 text-sm text-gray-600">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

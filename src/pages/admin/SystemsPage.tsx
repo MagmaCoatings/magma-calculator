@@ -95,7 +95,7 @@ interface SystemProductForm {
   coverage_sqm: number
   coverage_note: string
   option_group: string
-  depends_on_product_id: string
+  depends_on_product_id: string | null
 }
 
 export function SystemsPage() {
@@ -135,7 +135,7 @@ export function SystemsPage() {
     coverage_sqm: 0,
     coverage_note: '',
     option_group: '',
-    depends_on_product_id: "",
+    depends_on_product_id: null,
   })
   const [showProductModal, setShowProductModal] = useState(false)
   const [isAddingProduct, setIsAddingProduct] = useState(false)
