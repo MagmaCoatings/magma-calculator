@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { logUpdate } from '@/lib/activityLog'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Save, RefreshCw } from 'lucide-react'
@@ -50,6 +51,8 @@ export function SettingsPage() {
     setMessage(null)
 
     try {
+      const changedSettings: Record<string, any> = {}
+      
       for (const setting of settings) {
         const newValue = values[setting.key]
         if (newValue !== undefined) {
@@ -58,6 +61,11 @@ export function SettingsPage() {
           if (/^-?\d+\.?\d*$/.test(newValue)) {
             parsedValue = parseFloat(newValue)
           }
+          
+          // Track changed values
+          if (String(setting.value) !== String(parsedValue)) {
+            changedSettings[setting.key] = parsedValue
+          }
 
           await supabase
             .from('settings')
@@ -65,6 +73,12 @@ export function SettingsPage() {
             .eq('key', setting.key)
         }
       }
+      
+      // Log activity if any settings changed
+      if (Object.keys(changedSettings).length > 0) {
+        logUpdate('settings', 'global', 'System Settings', changedSettings)
+      }
+      
       setMessage({ type: 'success', text: 'Settings saved successfully' })
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message })

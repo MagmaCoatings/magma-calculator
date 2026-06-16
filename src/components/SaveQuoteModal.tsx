@@ -202,11 +202,11 @@ export function SaveQuoteModal({
               {/* Summary */}
               <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                 <div className="flex justify-between text-sm text-gray-600 mb-1">
-                  <span>{surfaceType}</span>
+                  <span className="capitalize">{surfaceType}</span>
                   <span>
-                    {floorArea > 0 && `${floorArea}m² floor`}
-                    {floorArea > 0 && wallArea > 0 && ' + '}
-                    {wallArea > 0 && `${wallArea}m² wall`}
+                    {surfaceType === 'floor' && `${floorArea}m²`}
+                    {surfaceType === 'wall' && `${wallArea}m²`}
+                    {surfaceType === 'both' && `${floorArea}m² floor + ${wallArea}m² wall`}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm text-gray-600">

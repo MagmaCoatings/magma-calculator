@@ -40,7 +40,7 @@ export async function logActivity({
       return
     }
 
-    await supabase.from('activity_log').insert({
+    const { error } = await supabase.from('activity_log').insert({
       user_id: user.id,
       action,
       entity_type: entityType,
@@ -48,6 +48,10 @@ export async function logActivity({
       entity_name: entityName || null,
       details: details || null
     })
+    
+    if (error) {
+      console.error('Activity log insert failed:', error)
+    }
   } catch (error) {
     // Don't throw - logging should never break the main flow
     console.error('Failed to log activity:', error)

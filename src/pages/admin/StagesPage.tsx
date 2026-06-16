@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { logCreate, logUpdate, logDelete } from '@/lib/activityLog'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Layers, Plus, Pencil, Trash2, GripVertical } from 'lucide-react'
@@ -43,18 +44,23 @@ export function StagesPage() {
 
     const maxOrder = stages.length > 0 ? Math.max(...stages.map(s => s.display_order)) : 0
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('stages')
       .insert({
         name: newStage.name.trim(),
         description: newStage.description.trim() || null,
         display_order: maxOrder + 1
       })
+      .select()
+      .single()
 
     if (error) {
       console.error('Error adding stage:', error)
       alert('Failed to add stage')
     } else {
+      // Log activity
+      logCreate('stage', data?.id || '', newStage.name.trim())
+      
       setNewStage({ name: '', description: '' })
       setShowAddForm(false)
       fetchStages()
@@ -76,12 +82,16 @@ export function StagesPage() {
       console.error('Error updating stage:', error)
       alert('Failed to update stage')
     } else {
+      // Log activity
+      logUpdate('stage', id, editForm.name.trim())
+      
       setEditingId(null)
       fetchStages()
     }
   }
 
   async function deleteStage(id: string) {
+    const stage = stages.find(s => s.id === id)
     if (!confirm('Are you sure you want to delete this stage? This may affect system configurations.')) return
 
     const { error } = await supabase
@@ -93,6 +103,9 @@ export function StagesPage() {
       console.error('Error deleting stage:', error)
       alert('Failed to delete stage. It may be in use.')
     } else {
+      // Log activity
+      logDelete('stage', id, stage?.name || 'Unknown')
+      
       fetchStages()
     }
   }

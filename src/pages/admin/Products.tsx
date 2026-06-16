@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { logCreate, logUpdate, logDelete } from '@/lib/activityLog'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +21,7 @@ export function ProductsPage() {
     pack_size: '',
     pack_unit: '',
     category_id: '',
+    description: '',
   })
   const [showAddForm, setShowAddForm] = useState(false)
   const [newProduct, setNewProduct] = useState({
@@ -70,8 +72,11 @@ export function ProductsPage() {
       pack_size: product.pack_size.toString(),
       pack_unit: product.pack_unit,
       category_id: product.category_id || '',
+      description: product.description || '',
     })
   }
+
+  const [savedId, setSavedId] = useState<string | null>(null)
 
   async function saveEdit(id: string) {
     const price = parseFloat(editForm.price)
@@ -95,12 +100,16 @@ export function ProductsPage() {
         pack_size,
         pack_unit: editForm.pack_unit,
         category_id: editForm.category_id || null,
+        description: editForm.description || null,
       })
       .eq('id', id)
 
     if (error) {
       alert('Error updating product: ' + error.message)
     } else {
+      // Log activity
+      logUpdate('product', id, editForm.name, { price, pack_size })
+      
       setProducts(products.map(p => p.id === id ? {
         ...p,
         name: editForm.name,
@@ -109,12 +118,17 @@ export function ProductsPage() {
         pack_size,
         pack_unit: editForm.pack_unit,
         category_id: editForm.category_id || null,
+        description: editForm.description || null,
       } : p))
       setEditingId(null)
+      // Show saved feedback
+      setSavedId(id)
+      setTimeout(() => setSavedId(null), 2000)
     }
   }
 
   async function toggleActive(id: string, currentStatus: boolean) {
+    const product = products.find(p => p.id === id)
     const { error } = await supabase
       .from('products')
       .update({ is_active: !currentStatus })
@@ -123,6 +137,9 @@ export function ProductsPage() {
     if (error) {
       alert('Error updating product: ' + error.message)
     } else {
+      // Log activity
+      logUpdate('product', id, product?.name || 'Unknown', { is_active: !currentStatus })
+      
       setProducts(products.map(p => p.id === id ? { ...p, is_active: !currentStatus } : p))
     }
   }
@@ -140,6 +157,9 @@ export function ProductsPage() {
     if (error) {
       alert('Error deleting product: ' + error.message)
     } else {
+      // Log activity
+      logDelete('product', id, name)
+      
       setProducts(products.filter(p => p.id !== id))
     }
   }
@@ -201,6 +221,9 @@ export function ProductsPage() {
     if (error) {
       alert('Error adding product: ' + error.message)
     } else {
+      // Log activity
+      logCreate('product', data.id, data.name, { code: data.code, price: data.price })
+      
       setProducts([...products, data])
       setShowAddForm(false)
       setNewProduct({
@@ -377,7 +400,14 @@ export function ProductsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {group.products.map((product, index) => (
-                    <tr key={product.id} className={!product.is_active ? 'bg-gray-50 opacity-60' : ''}>
+                    <React.Fragment key={product.id}>
+                    <tr className={`transition-colors ${
+                      savedId === product.id 
+                        ? 'bg-green-50' 
+                        : !product.is_active 
+                          ? 'bg-gray-50 opacity-60' 
+                          : ''
+                    }`}>
                       {/* Reorder buttons */}
                       <td className="px-2 py-3">
                         <div className="flex flex-col gap-0.5">
@@ -482,7 +512,21 @@ export function ProductsPage() {
                       ) : (
                         <>
                           <td className="px-4 py-3 text-sm font-mono text-gray-600">{product.code}</td>
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{product.name}</td>
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                            <span className="flex items-center gap-2">
+                              {product.name}
+                              {savedId === product.id && (
+                                <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">
+                                  Saved ✓
+                                </span>
+                              )}
+                            </span>
+                            {product.description && (
+                              <p className="text-xs text-gray-500 font-normal mt-0.5 truncate max-w-xs" title={product.description}>
+                                {product.description}
+                              </p>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-sm text-gray-600">{product.pack_size}{product.pack_unit}</td>
                           <td className="px-4 py-3 text-sm font-medium">£{formatCurrency(product.price)}</td>
                           <td className="px-4 py-3 text-sm">
@@ -526,7 +570,27 @@ export function ProductsPage() {
                         </>
                       )}
                     </tr>
-                  ))}
+                    {/* Description row when editing */}
+                    {editingId === product.id && (
+                      <tr className="bg-orange-50">
+                        <td colSpan={7} className="px-4 py-3">
+                          <div className="flex items-start gap-3">
+                            <label className="text-sm font-medium text-gray-700 pt-2 whitespace-nowrap">
+                              Tooltip info:
+                            </label>
+                            <textarea
+                              className="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-sm resize-none"
+                              rows={2}
+                              placeholder="Brief product description shown in calculator tooltip (e.g. 'High-build base coat for floors. Apply with trowel.')"
+                              value={editForm.description}
+                              onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
                 </tbody>
               </table>
             </div>

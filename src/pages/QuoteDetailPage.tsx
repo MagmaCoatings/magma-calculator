@@ -1,11 +1,21 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { PDFDownloadLink } from '@react-pdf/renderer'
 import { supabase } from '@/lib/supabase'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/formatters'
-import { ArrowLeft, Pencil, Save, Copy, Trash2, FileText, Send, CheckCircle, XCircle } from 'lucide-react'
+import { ArrowLeft, Pencil, Save, Copy, Trash2, FileText, Send, CheckCircle, XCircle, Plus, Download, Mail, History, Clock } from 'lucide-react'
+import { QuotePDF } from '@/components/QuotePDF'
+import { 
+  logQuoteStatusChange, 
+  logQuoteUpdated, 
+  logQuoteItemAdded, 
+  logQuoteItemRemoved, 
+  logQuoteItemUpdated,
+  logQuoteDuplicated 
+} from '@/lib/quoteHistory'
 
 interface Quote {
   id: string
@@ -34,6 +44,26 @@ interface QuoteItem {
   display_order: number
 }
 
+interface Product {
+  id: string
+  name: string
+  code: string
+  price: number
+  pack_size: number
+  pack_unit: string
+}
+
+interface HistoryEntry {
+  id: string
+  action: string
+  field_name: string | null
+  old_value: string | null
+  new_value: string | null
+  details: { productName?: string; quantity?: number; reference?: string; sourceReference?: string; newReference?: string } | null
+  created_at: string
+  user: { full_name: string | null; email: string } | null
+}
+
 export function QuoteDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -41,11 +71,24 @@ export function QuoteDetailPage() {
   const [items, setItems] = useState<QuoteItem[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [editItemQty, setEditItemQty] = useState(0)
   const [editForm, setEditForm] = useState({
     client_name: '',
     project_name: '',
     notes: '',
   })
+  
+  // Add product state
+  const [showAddProduct, setShowAddProduct] = useState(false)
+  const [products, setProducts] = useState<Product[]>([])
+  const [selectedProductId, setSelectedProductId] = useState('')
+  const [newProductQty, setNewProductQty] = useState(1)
+  const [addingProduct, setAddingProduct] = useState(false)
+  
+  // History state
+  const [history, setHistory] = useState<HistoryEntry[]>([])
+  const [showHistory, setShowHistory] = useState(false)
 
   useEffect(() => {
     if (id) fetchQuote()
@@ -83,6 +126,26 @@ export function QuoteDetailPage() {
     setLoading(false)
   }
 
+  function toggleHistory() {
+    if (!showHistory) {
+      fetchHistory()
+    }
+    setShowHistory(!showHistory)
+  }
+
+  async function fetchHistory() {
+    if (!id) return
+    
+    const { data } = await supabase
+      .from('quote_history')
+      .select('*, user:profiles(full_name, email)')
+      .eq('quote_id', id)
+      .order('created_at', { ascending: false })
+      .limit(50)
+    
+    setHistory(data || [])
+  }
+
   async function saveEdit() {
     if (!quote) return
 
@@ -99,6 +162,17 @@ export function QuoteDetailPage() {
     if (error) {
       alert('Error saving: ' + error.message)
     } else {
+      // Log changes
+      if (editForm.client_name !== (quote.client_name || '')) {
+        logQuoteUpdated(quote.id, 'client_name', quote.client_name, editForm.client_name || null)
+      }
+      if (editForm.project_name !== (quote.project_name || '')) {
+        logQuoteUpdated(quote.id, 'project_name', quote.project_name, editForm.project_name || null)
+      }
+      if (editForm.notes !== (quote.notes || '')) {
+        logQuoteUpdated(quote.id, 'notes', quote.notes, editForm.notes || null)
+      }
+      
       setQuote({
         ...quote,
         client_name: editForm.client_name || null,
@@ -111,7 +185,9 @@ export function QuoteDetailPage() {
 
   async function updateStatus(newStatus: string) {
     if (!quote) return
+    if (quote.status === newStatus) return // No change
 
+    const oldStatus = quote.status
     const { error } = await supabase
       .from('quotes')
       .update({ status: newStatus, updated_at: new Date().toISOString() })
@@ -120,6 +196,7 @@ export function QuoteDetailPage() {
     if (error) {
       alert('Error updating status: ' + error.message)
     } else {
+      logQuoteStatusChange(quote.id, oldStatus, newStatus)
       setQuote({ ...quote, status: newStatus })
     }
   }
@@ -138,6 +215,158 @@ export function QuoteDetailPage() {
     } else {
       navigate('/quotes')
     }
+  }
+
+  function startEditItem(item: QuoteItem) {
+    setEditingItemId(item.id)
+    setEditItemQty(item.quantity)
+  }
+
+  async function saveItemEdit(item: QuoteItem) {
+    if (!quote || editItemQty < 1) return
+    if (editItemQty === item.quantity) {
+      setEditingItemId(null)
+      return // No change
+    }
+
+    const newLineTotal = editItemQty * item.unit_price
+    const oldLineTotal = item.line_total
+    const oldQty = item.quantity
+
+    const { error } = await supabase
+      .from('quote_items')
+      .update({ quantity: editItemQty, line_total: newLineTotal })
+      .eq('id', item.id)
+
+    if (error) {
+      alert('Error updating item: ' + error.message)
+      return
+    }
+
+    // Log the change
+    logQuoteItemUpdated(quote.id, item.product_name, oldQty, editItemQty)
+
+    // Update local state
+    const updatedItems = items.map(i => 
+      i.id === item.id ? { ...i, quantity: editItemQty, line_total: newLineTotal } : i
+    )
+    setItems(updatedItems)
+
+    // Recalculate totals
+    const newSubtotal = quote.subtotal - oldLineTotal + newLineTotal
+    const newVat = newSubtotal * 0.2
+    const newTotal = newSubtotal + newVat
+
+    await supabase
+      .from('quotes')
+      .update({ subtotal: newSubtotal, vat: newVat, total: newTotal, updated_at: new Date().toISOString() })
+      .eq('id', quote.id)
+
+    setQuote({ ...quote, subtotal: newSubtotal, vat: newVat, total: newTotal })
+    setEditingItemId(null)
+  }
+
+  async function deleteItem(item: QuoteItem) {
+    if (!quote) return
+    if (!confirm(`Remove ${item.product_name} from quote?`)) return
+
+    const { error } = await supabase
+      .from('quote_items')
+      .delete()
+      .eq('id', item.id)
+
+    if (error) {
+      alert('Error removing item: ' + error.message)
+      return
+    }
+
+    // Log the removal
+    logQuoteItemRemoved(quote.id, item.product_name)
+
+    // Update local state
+    const updatedItems = items.filter(i => i.id !== item.id)
+    setItems(updatedItems)
+
+    // Recalculate totals
+    const newSubtotal = quote.subtotal - item.line_total
+    const newVat = newSubtotal * 0.2
+    const newTotal = newSubtotal + newVat
+
+    await supabase
+      .from('quotes')
+      .update({ subtotal: newSubtotal, vat: newVat, total: newTotal, updated_at: new Date().toISOString() })
+      .eq('id', quote.id)
+
+    setQuote({ ...quote, subtotal: newSubtotal, vat: newVat, total: newTotal })
+  }
+
+  async function fetchProducts() {
+    const { data } = await supabase
+      .from('products')
+      .select('id, name, code, price, pack_size, pack_unit')
+      .eq('is_active', true)
+      .order('name')
+    
+    setProducts(data || [])
+  }
+
+  function openAddProduct() {
+    fetchProducts()
+    setSelectedProductId('')
+    setNewProductQty(1)
+    setShowAddProduct(true)
+  }
+
+  async function addProductToQuote() {
+    if (!quote || !selectedProductId) return
+    
+    const product = products.find(p => p.id === selectedProductId)
+    if (!product) return
+
+    setAddingProduct(true)
+
+    const lineTotal = newProductQty * product.price
+    const maxOrder = Math.max(...items.map(i => i.display_order || 0), 0)
+
+    const { data: newItem, error } = await supabase
+      .from('quote_items')
+      .insert({
+        quote_id: quote.id,
+        product_code: product.code,
+        product_name: product.name,
+        quantity: newProductQty,
+        unit_price: product.price,
+        line_total: lineTotal,
+        display_order: maxOrder + 1,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      alert('Error adding product: ' + error.message)
+      setAddingProduct(false)
+      return
+    }
+
+    // Log the addition
+    logQuoteItemAdded(quote.id, product.name, newProductQty)
+
+    // Update local state
+    setItems([...items, newItem])
+
+    // Recalculate totals
+    const newSubtotal = quote.subtotal + lineTotal
+    const newVat = newSubtotal * 0.2
+    const newTotal = newSubtotal + newVat
+
+    await supabase
+      .from('quotes')
+      .update({ subtotal: newSubtotal, vat: newVat, total: newTotal, updated_at: new Date().toISOString() })
+      .eq('id', quote.id)
+
+    setQuote({ ...quote, subtotal: newSubtotal, vat: newVat, total: newTotal })
+    setShowAddProduct(false)
+    setAddingProduct(false)
   }
 
   async function duplicateQuote() {
@@ -186,6 +415,9 @@ export function QuoteDetailPage() {
       await supabase.from('quote_items').insert(newItems)
     }
 
+    // Log duplication on the new quote
+    logQuoteDuplicated(newQuote.id, quote.reference, newRef)
+
     navigate(`/quotes/${newQuote.id}`)
   }
 
@@ -204,6 +436,42 @@ export function QuoteDetailPage() {
 
     navigator.clipboard.writeText(text)
     alert('Copied to clipboard!')
+  }
+
+  function sendQuoteEmail() {
+    if (!quote) return
+
+    const getAreaDisplay = () => {
+      if (quote.surface_type === 'floor') return `${quote.floor_area}m² floor`
+      if (quote.surface_type === 'wall') return `${quote.wall_area}m² wall`
+      return `${quote.floor_area}m² floor + ${quote.wall_area}m² wall`
+    }
+
+    const materialsList = items.map(item => 
+      `${item.quantity} × ${item.product_name} @ £${formatCurrency(item.unit_price)} each = £${formatCurrency(item.line_total)}`
+    ).join('\n')
+
+    const subject = `Quote ${quote.reference}${quote.project_name ? ` - ${quote.project_name}` : ''}`
+    
+    const body = `Could I please place the order for the following materials:
+
+QUOTE REFERENCE: ${quote.reference}
+${quote.client_name ? `\nClient: ${quote.client_name}` : ''}
+Surface: ${quote.surface_type.charAt(0).toUpperCase() + quote.surface_type.slice(1)}
+Area: ${getAreaDisplay()}
+
+MATERIALS
+${materialsList}
+
+TOTALS
+Subtotal: £${formatCurrency(quote.subtotal)}
+VAT (20%): £${formatCurrency(quote.vat)}
+Total: £${formatCurrency(quote.total)}
+
+Thank you...`
+
+    const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+    window.location.href = mailtoLink
   }
 
   function formatDate(dateStr: string) {
@@ -248,12 +516,56 @@ export function QuoteDetailPage() {
           <h1 className="text-2xl font-bold text-gray-900 font-mono">{quote.reference}</h1>
           <p className="text-gray-500 text-sm mt-1">Created {formatDate(quote.created_at)}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <PDFDownloadLink
+            document={
+              <QuotePDF
+                reference={quote.reference}
+                clientName={quote.client_name}
+                projectName={quote.project_name}
+                surfaceType={quote.surface_type}
+                floorArea={quote.floor_area}
+                wallArea={quote.wall_area}
+                notes={quote.notes}
+                items={items}
+                subtotal={quote.subtotal}
+                vat={quote.vat}
+                total={quote.total}
+                createdAt={quote.created_at}
+              />
+            }
+            fileName={`${quote.reference}.pdf`}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50"
+          >
+            {({ loading: pdfLoading }) =>
+              pdfLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  PDF
+                </>
+              )
+            }
+          </PDFDownloadLink>
+          <Button variant="outline" size="sm" onClick={sendQuoteEmail}>
+            <Mail className="w-4 h-4 mr-1" /> Email
+          </Button>
           <Button variant="outline" size="sm" onClick={copyShoppingList}>
             <Copy className="w-4 h-4 mr-1" /> Copy List
           </Button>
           <Button variant="outline" size="sm" onClick={duplicateQuote}>
             <FileText className="w-4 h-4 mr-1" /> Duplicate
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={toggleHistory}
+          >
+            <History className="w-4 h-4 mr-1" /> History
           </Button>
           <Button variant="outline" size="sm" onClick={deleteQuote} className="text-red-600 hover:bg-red-50">
             <Trash2 className="w-4 h-4" />
@@ -354,9 +666,9 @@ export function QuoteDetailPage() {
                 <div>
                   <span className="text-sm text-gray-500">Area</span>
                   <p className="font-medium">
-                    {quote.floor_area > 0 && `${quote.floor_area}m² floor`}
-                    {quote.floor_area > 0 && quote.wall_area > 0 && ' + '}
-                    {quote.wall_area > 0 && `${quote.wall_area}m² wall`}
+                    {quote.surface_type === 'floor' && `${quote.floor_area}m²`}
+                    {quote.surface_type === 'wall' && `${quote.wall_area}m²`}
+                    {quote.surface_type === 'both' && `${quote.floor_area}m² floor + ${quote.wall_area}m² wall`}
                   </p>
                 </div>
                 {quote.notes && (
@@ -398,10 +710,67 @@ export function QuoteDetailPage() {
 
       {/* Line Items */}
       <Card className="mt-6">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Materials ({items.length} items)</CardTitle>
+          <Button variant="outline" size="sm" onClick={openAddProduct}>
+            <Plus className="w-4 h-4 mr-1" /> Add Product
+          </Button>
         </CardHeader>
         <CardContent className="p-0">
+          {/* Smart calculation explanation */}
+          {items.some(item => item.product_name.includes('✦')) && (
+            <div className="mx-4 mt-4 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
+              <p className="text-xs text-purple-700">
+                <span className="font-semibold">✦ Smart calculation:</span> These materials were calculated once for the combined floor + wall area — no need to buy separately for each surface.
+              </p>
+            </div>
+          )}
+          
+          {/* Add product form */}
+          {showAddProduct && (
+            <div className="mx-4 mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <h4 className="font-medium text-gray-900 mb-3">Add Product</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-sm text-gray-600 mb-1">Product</label>
+                  <select
+                    value={selectedProductId}
+                    onChange={e => setSelectedProductId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                  >
+                    <option value="">Select a product...</option>
+                    {products.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} — £{formatCurrency(p.price)} / {p.pack_size}{p.pack_unit}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Quantity</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={newProductQty}
+                    onChange={e => setNewProductQty(parseInt(e.target.value) || 1)}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <Button 
+                  onClick={addProductToQuote} 
+                  disabled={!selectedProductId || addingProduct}
+                  size="sm"
+                >
+                  {addingProduct ? 'Adding...' : 'Add to Quote'}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowAddProduct(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+          
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
@@ -409,6 +778,7 @@ export function QuoteDetailPage() {
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qty</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Unit Price</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                <th className="px-4 py-3 w-20"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -416,17 +786,154 @@ export function QuoteDetailPage() {
                 <tr key={item.id}>
                   <td className="px-4 py-3">
                     <span className="font-medium text-gray-900">{item.product_name}</span>
-                    <span className="text-gray-400 text-sm ml-2">({item.product_code})</span>
+                    {item.product_code && (
+                      <span className="text-gray-400 text-sm ml-2">({item.product_code})</span>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-right text-gray-600">{item.quantity}</td>
+                  <td className="px-4 py-3 text-right text-gray-600">
+                    {editingItemId === item.id ? (
+                      <input
+                        type="number"
+                        min="1"
+                        value={editItemQty}
+                        onChange={e => setEditItemQty(parseInt(e.target.value) || 1)}
+                        className="w-16 px-2 py-1 text-right border border-gray-300 rounded"
+                        autoFocus
+                      />
+                    ) : (
+                      item.quantity
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right text-gray-600">£{formatCurrency(item.unit_price)}</td>
-                  <td className="px-4 py-3 text-right font-medium">£{formatCurrency(item.line_total)}</td>
+                  <td className="px-4 py-3 text-right font-medium">
+                    £{formatCurrency(editingItemId === item.id ? editItemQty * item.unit_price : item.line_total)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {editingItemId === item.id ? (
+                      <div className="flex gap-1 justify-end">
+                        <button
+                          onClick={() => saveItemEdit(item)}
+                          className="p-1 text-green-600 hover:bg-green-50 rounded"
+                          title="Save"
+                        >
+                          <Save className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setEditingItemId(null)}
+                          className="p-1 text-gray-400 hover:bg-gray-100 rounded"
+                          title="Cancel"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-1 justify-end">
+                        <button
+                          onClick={() => startEditItem(item)}
+                          className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                          title="Edit quantity"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => deleteItem(item)}
+                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                          title="Remove item"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </CardContent>
       </Card>
+
+      {/* History Panel */}
+      {showHistory && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5" />
+              Quote History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {history.length === 0 ? (
+              <p className="text-gray-500 text-sm">No history recorded yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {history.map(entry => (
+                  <div key={entry.id} className="flex gap-3 text-sm border-b border-gray-100 pb-3 last:border-0">
+                    <div className="flex-shrink-0 w-24 text-gray-400">
+                      {new Date(entry.created_at).toLocaleDateString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                      })}
+                      <br />
+                      <span className="text-xs">
+                        {new Date(entry.created_at).toLocaleTimeString('en-GB', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      {entry.action === 'created' && (
+                        <span className="text-green-600">Quote created</span>
+                      )}
+                      {entry.action === 'status_changed' && (
+                        <span>
+                          Status changed from <span className="font-medium">{entry.old_value}</span> to{' '}
+                          <span className="font-medium">{entry.new_value}</span>
+                        </span>
+                      )}
+                      {entry.action === 'updated' && (
+                        <span>
+                          Updated <span className="font-medium">{entry.field_name?.replace('_', ' ')}</span>
+                          {entry.old_value && entry.new_value && (
+                            <>
+                              {' '}from "{entry.old_value}" to "{entry.new_value}"
+                            </>
+                          )}
+                        </span>
+                      )}
+                      {entry.action === 'item_added' && (
+                        <span className="text-green-600">
+                          Added <span className="font-medium">{entry.details?.productName}</span> × {entry.details?.quantity}
+                        </span>
+                      )}
+                      {entry.action === 'item_removed' && (
+                        <span className="text-red-600">
+                          Removed <span className="font-medium">{entry.details?.productName}</span>
+                        </span>
+                      )}
+                      {entry.action === 'item_updated' && (
+                        <span>
+                          Changed <span className="font-medium">{entry.details?.productName}</span> quantity: {entry.old_value} → {entry.new_value}
+                        </span>
+                      )}
+                      {entry.action === 'duplicated' && (
+                        <span className="text-blue-600">
+                          Duplicated from <span className="font-medium">{entry.details?.sourceReference}</span>
+                        </span>
+                      )}
+                      {entry.user && (
+                        <span className="text-gray-400 ml-2">
+                          by {entry.user.full_name || entry.user.email}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

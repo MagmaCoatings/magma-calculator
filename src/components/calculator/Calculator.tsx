@@ -15,6 +15,7 @@ interface System {
   name: string
   description: string | null
   surface_type: 'floor' | 'wall' | 'both'
+  family: string | null
 }
 
 interface SystemProduct {
@@ -34,6 +35,7 @@ interface SystemProduct {
   depends_on_product_id: string | null
   coverage_note: string | null
   display_order: number
+  shared_across_surfaces: boolean
   surface_type?: 'floor' | 'wall'  // Added for "both" mode
   product: {
     id: string
@@ -63,6 +65,8 @@ export function Calculator() {
   const { profile } = useAuth()
   const showTooltips = profile?.show_tooltips ?? true
   const [systems, setSystems] = useState<System[]>([])
+  const [families, setFamilies] = useState<string[]>([])
+  const [selectedFamily, setSelectedFamily] = useState<string | null>(null)
   const [systemProducts, setSystemProducts] = useState<SystemProduct[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -116,9 +120,23 @@ export function Calculator() {
       }
       
       setSystems(data)
-      // Auto-select first floor and wall systems
-      const floorSystem = data.find(s => s.surface_type === 'floor')
-      const wallSystem = data.find(s => s.surface_type === 'wall')
+      
+      // Extract unique families
+      const uniqueFamilies = [...new Set(data.map(s => s.family).filter(Boolean))] as string[]
+      setFamilies(uniqueFamilies)
+      
+      // Auto-select first family if there are multiple
+      const initialFamily = uniqueFamilies.length > 0 ? uniqueFamilies[0] : null
+      setSelectedFamily(initialFamily)
+      
+      // Filter by initial family
+      const familySystems = initialFamily 
+        ? data.filter(s => s.family === initialFamily)
+        : data
+      
+      // Auto-select first floor and wall systems from filtered list
+      const floorSystem = familySystems.find(s => s.surface_type === 'floor')
+      const wallSystem = familySystems.find(s => s.surface_type === 'wall')
       if (floorSystem) {
         setFloorSystemId(floorSystem.id)
         handleSystemChange(floorSystem.id)
@@ -215,6 +233,38 @@ export function Calculator() {
     } catch {
       // Silently fail - products will be empty, user can retry via system selection
       console.error('Failed to load system products')
+    }
+  }
+
+  // Handle family change - reset system selections
+  function handleFamilyChange(family: string) {
+    setSelectedFamily(family)
+    
+    // Clear current selections
+    setSelectedSystemId(null)
+    setFloorSystemId(null)
+    setWallSystemId(null)
+    setSystemProducts([])
+    setFloorProducts([])
+    setWallProducts([])
+    setLayerStates({})
+    
+    // Auto-select first systems from the new family
+    const familySystems = systems.filter(s => s.family === family)
+    const floorSystem = familySystems.find(s => s.surface_type === 'floor')
+    const wallSystem = familySystems.find(s => s.surface_type === 'wall')
+    
+    if (floorSystem) {
+      setFloorSystemId(floorSystem.id)
+      if (surface === 'floor' || surface === 'both') {
+        handleSystemChange(floorSystem.id)
+      }
+    }
+    if (wallSystem) {
+      setWallSystemId(wallSystem.id)
+      if (surface === 'both') {
+        loadSurfaceProducts(wallSystem.id, 'wall')
+      }
     }
   }
 
@@ -366,16 +416,27 @@ export function Calculator() {
 
   // Calculate materials
   function calculate() {
-    const items: { name: string; qty: string; units: number; unitSize: string; cost: number }[] = []
+    const items: { name: string; qty: string; units: number; unitSize: string; cost: number; stageOrder: number; productOrder: number; surfaceType: number }[] = []
     const floorAreaNum = floorArea === '' ? 0 : floorArea
     const wallAreaNum = wallArea === '' ? 0 : wallArea
     const wastageNum = wastagePercent === '' ? 0 : wastagePercent
     const floorAreaWithWastage = floorAreaNum * (1 + wastageNum / 100)
     const wallAreaWithWastage = wallAreaNum * (1 + wastageNum / 100)
+    const combinedAreaWithWastage = floorAreaWithWastage + wallAreaWithWastage
     let totalPigmentPacks = 0
+    
+    // Track shared products already processed (by product_id)
+    const processedSharedProducts = new Set<string>()
 
     // Helper to process products for a surface
-    function processProducts(products: SystemProduct[], prefix: string, area: number, surfaceLabel: string) {
+    function processProducts(
+      products: SystemProduct[], 
+      prefix: string, 
+      area: number, 
+      surfaceLabel: string,
+      skipShared: boolean = false,
+      isSharedPass: boolean = false
+    ) {
       Object.entries(layerStates).forEach(([key, state]) => {
         if (!key.startsWith(prefix) && prefix !== '') return
         if (!state.enabled) return
@@ -384,6 +445,14 @@ export function Calculator() {
         const sp = products.find(p => p.product_id === state.selectedProductId)
         if (!sp || !sp.product) return
         
+        // Handle shared products
+        if (skipShared && sp.shared_across_surfaces) return
+        if (isSharedPass && !sp.shared_across_surfaces) return
+        
+        // Skip if this shared product was already processed
+        if (sp.shared_across_surfaces && processedSharedProducts.has(sp.product_id)) return
+        if (sp.shared_across_surfaces) processedSharedProducts.add(sp.product_id)
+        
         if (sp.product.name?.toLowerCase().includes('pigment')) return
 
         const coats = state.coats || 1
@@ -391,14 +460,33 @@ export function Calculator() {
         const areaWithCoats = area * coats
         const unitsNeeded = Math.ceil(areaWithCoats / coverage)
 
-        const displayName = surface === 'both' ? `${surfaceLabel}${sp.product.name}` : sp.product.name
+        // Shared products don't get F/W prefix, but get a badge
+        const isSharedInBothMode = surface === 'both' && sp.shared_across_surfaces
+        const displayName = (surface === 'both' && !sp.shared_across_surfaces) 
+          ? `${surfaceLabel}${sp.product.name}` 
+          : sp.product.name
+
+        // For shared products in both mode, make it very clear it covers both areas
+        let qtyDisplay: string
+        if (isSharedInBothMode) {
+          qtyDisplay = coats > 1 
+            ? `${area.toFixed(1)}m² total (floor + wall combined) × ${coats} coats` 
+            : `${area.toFixed(1)}m² total (floor + wall combined)`
+        } else {
+          qtyDisplay = coats > 1 
+            ? `${area.toFixed(1)}m² × ${coats} coats` 
+            : `${area.toFixed(1)}m²`
+        }
 
         items.push({
-          name: displayName,
-          qty: coats > 1 ? `${area.toFixed(1)}m² × ${coats} coats` : `${area.toFixed(1)}m²`,
+          name: isSharedInBothMode ? `${displayName} ✦` : displayName,
+          qty: qtyDisplay,
           units: unitsNeeded,
           unitSize: `${sp.product.pack_size}${sp.product.pack_unit}`,
           cost: unitsNeeded * sp.product.price,
+          stageOrder: sp.stage?.display_order || 0,
+          productOrder: sp.display_order || 0,
+          surfaceType: isSharedPass ? 0 : (prefix === 'floor_' ? 1 : 2), // 0=shared, 1=floor, 2=wall
         })
 
         if (state.pigment && sp.has_pigment) {
@@ -408,8 +496,13 @@ export function Calculator() {
     }
 
     if (surface === 'both') {
-      processProducts(floorProducts, 'floor_', floorAreaWithWastage, '(F) ')
-      processProducts(wallProducts, 'wall_', wallAreaWithWastage, '(W) ')
+      // First pass: process shared products from both systems using combined area
+      processProducts(floorProducts, 'floor_', combinedAreaWithWastage, '', false, true)
+      processProducts(wallProducts, 'wall_', combinedAreaWithWastage, '', false, true)
+      
+      // Second pass: process non-shared products with their respective areas
+      processProducts(floorProducts, 'floor_', floorAreaWithWastage, '(F) ', true, false)
+      processProducts(wallProducts, 'wall_', wallAreaWithWastage, '(W) ', true, false)
     } else {
       const area = surface === 'floor' ? floorAreaWithWastage : wallAreaWithWastage
       processProducts(systemProducts, '', area, '')
@@ -431,11 +524,55 @@ export function Calculator() {
         units: totalPigmentPacks,
         unitSize: 'pot',
         cost: totalPigmentPacks * pigmentPrice,
+        stageOrder: 999, // Pigment goes last
+        productOrder: 0,
+        surfaceType: 3, // After everything
       })
     }
 
-    const subtotal = items.reduce((sum, item) => sum + item.cost, 0)
-    return { items, subtotal }
+    // Sort items by stage order, then floor before wall, then product order
+    items.sort((a, b) => {
+      if (a.stageOrder !== b.stageOrder) return a.stageOrder - b.stageOrder
+      if (a.surfaceType !== b.surfaceType) return a.surfaceType - b.surfaceType
+      return a.productOrder - b.productOrder
+    })
+
+    // Consolidate matching products (combine F + W into single line)
+    const productMap = new Map<string, typeof items[0]>()
+    
+    for (const item of items) {
+      // Extract base product name (remove F/W prefix)
+      const baseName = item.name.replace(/^\(F\)\s*/, '').replace(/^\(W\)\s*/, '').replace(/\s*✦$/, '')
+      const isFloor = item.name.startsWith('(F)')
+      const isWall = item.name.startsWith('(W)')
+      const isShared = item.name.includes('✦')
+      
+      const existing = productMap.get(baseName)
+      if (existing && !isShared) {
+        // Combine quantities
+        existing.units += item.units
+        existing.cost += item.cost
+        // Update name to show F+W if combining
+        const existingIsFloor = existing.name.startsWith('(F)')
+        const existingIsWall = existing.name.startsWith('(W)')
+        if ((existingIsFloor && isWall) || (existingIsWall && isFloor)) {
+          existing.name = `(F+W) ${baseName}`
+        }
+        // Keep the better qty display (just units)
+        existing.qty = `${existing.units} units`
+      } else {
+        productMap.set(baseName, { ...item })
+      }
+    }
+    
+    // Convert map back to sorted array (maintain stage order)
+    const sortedItems = Array.from(productMap.values()).sort((a, b) => {
+      if (a.stageOrder !== b.stageOrder) return a.stageOrder - b.stageOrder
+      return a.productOrder - b.productOrder
+    })
+
+    const subtotal = sortedItems.reduce((sum, item) => sum + item.cost, 0)
+    return { items: sortedItems, subtotal }
   }
 
   const { items, subtotal } = calculate()
@@ -507,8 +644,8 @@ export function Calculator() {
               {hasMultipleProducts 
                 ? stageName 
                 : selectedProduct?.product?.name || layer.products[0]?.product?.name || stageName}
-              {showTooltips && !hasMultipleProducts && selectedProduct && (
-                <InfoTip content={selectedProduct.coverage_note || selectedProduct.product?.description || ''} />
+              {showTooltips && !hasMultipleProducts && selectedProduct?.product?.description && (
+                <InfoTip content={selectedProduct.product.description} />
               )}
             </p>
             {selectedProduct?.coverage_note && (
@@ -547,8 +684,8 @@ export function Calculator() {
                     >
                       {sp.product?.name?.replace('Magma ', '').replace(' Microcement', '') || 'Product'}
                     </button>
-                    {showTooltips && (sp.coverage_note || sp.product?.description) && (
-                      <InfoTip content={sp.coverage_note || sp.product?.description || ''} />
+                    {showTooltips && sp.product?.description && (
+                      <InfoTip content={sp.product.description} />
                     )}
                   </div>
                 ))}
@@ -676,8 +813,11 @@ export function Calculator() {
     )
   }
 
-  // Filter systems by surface type
+  // Filter systems by surface type and family
   const availableSystems = systems.filter(s => {
+    // First filter by family
+    if (selectedFamily && s.family !== selectedFamily) return false
+    // Then filter by surface type
     if (surface === 'floor') return s.surface_type === 'floor' || s.name.toLowerCase().includes('floor')
     if (surface === 'wall') return s.surface_type === 'wall' || s.name.toLowerCase().includes('wall')
     return true
@@ -689,6 +829,25 @@ export function Calculator() {
         <h1 className="text-2xl font-semibold text-gray-900">Magma Calculator</h1>
         <p className="text-gray-500 text-sm mt-1">Material estimator for microcement systems</p>
       </div>
+
+      {/* Family selector - only show if there are multiple families */}
+      {families.length > 1 && (
+        <div className="flex justify-center gap-2 mb-6">
+          {families.map(family => (
+            <button
+              key={family}
+              onClick={() => handleFamilyChange(family)}
+              className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all ${
+                selectedFamily === family
+                  ? 'bg-gray-900 text-white shadow-md'
+                  : 'bg-white border border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {family}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-[1fr_340px] gap-6">
         {/* Configuration */}
@@ -768,7 +927,7 @@ export function Calculator() {
                 </div>
                 <p className="text-xs text-gray-400 mb-2">Build type</p>
                 <div className="flex gap-2 mb-4">
-                  {systems.filter(s => s.surface_type === 'floor').map(system => (
+                  {systems.filter(s => s.surface_type === 'floor' && (!selectedFamily || s.family === selectedFamily)).map(system => (
                     <button
                       key={system.id}
                       onClick={() => handleFloorSystemChange(system.id)}
@@ -795,7 +954,7 @@ export function Calculator() {
                 </div>
                 <p className="text-xs text-gray-400 mb-2">Build type</p>
                 <div className="flex gap-2 mb-4">
-                  {systems.filter(s => s.surface_type === 'wall').map(system => (
+                  {systems.filter(s => s.surface_type === 'wall' && (!selectedFamily || s.family === selectedFamily)).map(system => (
                     <button
                       key={system.id}
                       onClick={() => handleWallSystemChange(system.id)}
@@ -987,6 +1146,15 @@ export function Calculator() {
                     </div>
                   ))}
                 </div>
+
+                {/* Legend for shared materials */}
+                {surface === 'both' && items.some(item => item.name.includes('✦')) && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 mb-4">
+                    <p className="text-xs text-purple-700">
+                      <span className="font-semibold">✦ Smart calculation:</span> These materials are calculated once for the combined floor + wall area — no need to buy separately for each surface.
+                    </p>
+                  </div>
+                )}
 
                 <div className="border-t-2 border-gray-200 pt-4 space-y-2">
                   <div className="flex justify-between text-sm">

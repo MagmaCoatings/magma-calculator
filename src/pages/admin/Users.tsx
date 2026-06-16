@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { logUpdate } from '@/lib/activityLog'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Users, Mail, Shield, ShieldOff, ChevronLeft, ChevronRight, Copy, ChevronDown, ChevronUp, Check } from 'lucide-react'
@@ -61,6 +62,7 @@ export function UsersPage() {
   }
 
   async function toggleRole(userId: string, currentRole: string) {
+    const user = users.find(u => u.id === userId)
     const newRole = currentRole === 'admin' ? 'user' : 'admin'
     const { error } = await supabase
       .from('profiles')
@@ -71,11 +73,15 @@ export function UsersPage() {
       console.error('Error updating role:', error)
       alert('Failed to update role')
     } else {
+      // Log activity
+      logUpdate('user', userId, user?.email || 'Unknown', { role: newRole })
+      
       fetchUsers()
     }
   }
 
   async function toggleStatus(userId: string, currentStatus: string) {
+    const user = users.find(u => u.id === userId)
     const newStatus = currentStatus === 'active' ? 'suspended' : 'active'
     const { error } = await supabase
       .from('profiles')
@@ -86,6 +92,9 @@ export function UsersPage() {
       console.error('Error updating status:', error)
       alert('Failed to update status')
     } else {
+      // Log activity
+      logUpdate('user', userId, user?.email || 'Unknown', { status: newStatus })
+      
       fetchUsers()
     }
   }

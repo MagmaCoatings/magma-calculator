@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { logCreate, logUpdate } from '@/lib/activityLog'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +11,7 @@ interface System {
   name: string
   description: string | null
   surface_type: 'floor' | 'wall' | 'both'
+  family: string | null
   is_active: boolean
   display_order: number
 }
@@ -44,6 +46,7 @@ interface SystemProduct {
   coverage_note: string | null
   display_order: number
   depends_on_product_id: string | null
+  shared_across_surfaces: boolean
   product?: Product
   stage?: Stage
 }
@@ -96,6 +99,7 @@ interface SystemProductForm {
   coverage_note: string
   option_group: string
   depends_on_product_id: string | null
+  shared_across_surfaces: boolean
 }
 
 export function SystemsPage() {
@@ -108,12 +112,19 @@ export function SystemsPage() {
   const [systemProducts, setSystemProducts] = useState<SystemProduct[]>([])
   const [finishPresets, setFinishPresets] = useState<FinishPreset[]>([])
   const [showAddSystem, setShowAddSystem] = useState(false)
-  const [newSystem, setNewSystem] = useState({ name: '', description: '', surface_type: 'floor' as const })
+  const [newSystem, setNewSystem] = useState({ name: '', description: '', surface_type: 'floor' as const, family: 'Microcement' })
+  const [newFamilyName, setNewFamilyName] = useState('')
+
+  // Extract unique families from existing systems
+  const existingFamilies = [...new Set(systems.map(s => s.family).filter(Boolean))] as string[]
+  if (existingFamilies.length === 0) existingFamilies.push('Microcement') // Default if none exist
 
   // System editing state (rename/delete)
   const [editingSystemId, setEditingSystemId] = useState<string | null>(null)
   const [editSystemName, setEditSystemName] = useState('')
   const [editSystemDescription, setEditSystemDescription] = useState('')
+  const [editSystemFamily, setEditSystemFamily] = useState('')
+  const [editNewFamilyName, setEditNewFamilyName] = useState('')
   const [deletingSystemId, setDeletingSystemId] = useState<string | null>(null)
 
   // Preset editing state
@@ -136,6 +147,7 @@ export function SystemsPage() {
     coverage_note: '',
     option_group: '',
     depends_on_product_id: null,
+    shared_across_surfaces: false,
   })
   const [showProductModal, setShowProductModal] = useState(false)
   const [isAddingProduct, setIsAddingProduct] = useState(false)
@@ -193,6 +205,17 @@ export function SystemsPage() {
 
   async function createSystem() {
     if (!newSystem.name.trim()) return
+    
+    // Determine actual family name
+    const familyValue = newSystem.family === '__new__' 
+      ? newFamilyName.trim() 
+      : newSystem.family
+    
+    if (newSystem.family === '__new__' && !newFamilyName.trim()) {
+      alert('Please enter a family name')
+      return
+    }
+    
     const maxOrder = Math.max(...systems.map(s => s.display_order), 0)
     const { data } = await supabase
       .from('systems')
@@ -200,6 +223,7 @@ export function SystemsPage() {
         name: newSystem.name.trim(),
         description: newSystem.description.trim() || null,
         surface_type: newSystem.surface_type,
+        family: familyValue || null,
         is_active: true,
         display_order: maxOrder + 1
       })
@@ -207,8 +231,12 @@ export function SystemsPage() {
       .single()
     if (data) {
       setSystems([...systems, data])
-      setNewSystem({ name: '', description: '', surface_type: 'floor' })
+      setNewSystem({ name: '', description: '', surface_type: 'floor', family: familyValue || 'Microcement' })
+      setNewFamilyName('')
       setShowAddSystem(false)
+      
+      // Log activity
+      logCreate('system', data.id, data.name, { surface_type: data.surface_type, family: data.family })
     }
   }
 
@@ -219,38 +247,58 @@ export function SystemsPage() {
       .eq('id', system.id)
     if (!error) {
       setSystems(systems.map(s => s.id === system.id ? { ...s, is_active: !s.is_active } : s))
+      
+      // Log activity
+      logUpdate('system', system.id, system.name, { is_active: !system.is_active })
     }
   }
 
-  // Start editing a system's name/description
+  // Start editing a system's name/description/family
   function startEditSystem(system: System, e: React.MouseEvent) {
     e.stopPropagation()
     setEditingSystemId(system.id)
     setEditSystemName(system.name)
     setEditSystemDescription(system.description || '')
+    setEditSystemFamily(system.family || '')
   }
 
-  // Save system name/description changes
+  // Save system name/description/family changes
   async function saveSystemEdit() {
     if (!editingSystemId || !editSystemName.trim()) return
+    
+    // Determine actual family name
+    const familyValue = editSystemFamily === '__new__' 
+      ? editNewFamilyName.trim() 
+      : editSystemFamily.trim()
+    
+    if (editSystemFamily === '__new__' && !editNewFamilyName.trim()) {
+      alert('Please enter a family name')
+      return
+    }
     
     const { error } = await supabase
       .from('systems')
       .update({ 
         name: editSystemName.trim(),
-        description: editSystemDescription.trim() || null
+        description: editSystemDescription.trim() || null,
+        family: familyValue || null
       })
       .eq('id', editingSystemId)
     
     if (!error) {
+      // Log activity
+      logUpdate('system', editingSystemId, editSystemName.trim(), { family: familyValue })
+      
       setSystems(systems.map(s => 
         s.id === editingSystemId 
-          ? { ...s, name: editSystemName.trim(), description: editSystemDescription.trim() || null }
+          ? { ...s, name: editSystemName.trim(), description: editSystemDescription.trim() || null, family: familyValue || null }
           : s
       ))
       setEditingSystemId(null)
       setEditSystemName('')
       setEditSystemDescription('')
+      setEditSystemFamily('')
+      setEditNewFamilyName('')
     }
   }
 
@@ -259,6 +307,8 @@ export function SystemsPage() {
     setEditingSystemId(null)
     setEditSystemName('')
     setEditSystemDescription('')
+    setEditSystemFamily('')
+    setEditNewFamilyName('')
   }
 
   // Confirm delete system
@@ -315,6 +365,7 @@ export function SystemsPage() {
       coverage_note: '',
       option_group: '',
       depends_on_product_id: '',
+      shared_across_surfaces: false,
     })
     setShowProductModal(true)
   }
@@ -334,6 +385,7 @@ export function SystemsPage() {
       coverage_note: sp.coverage_note || '',
       option_group: sp.option_group || '',
       depends_on_product_id: sp.depends_on_product_id || '',
+      shared_across_surfaces: sp.shared_across_surfaces || false,
     })
     setShowProductModal(true)
   }
@@ -393,8 +445,9 @@ export function SystemsPage() {
       }
       
       const maxOrder = Math.max(...systemProducts.map(sp => sp.display_order || 0), 0)
+      const productName = products.find(p => p.id === newProductId)?.name || 'Unknown'
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('system_products')
         .insert({
           system_id: selectedSystem.id,
@@ -402,6 +455,7 @@ export function SystemsPage() {
           stage_id: newProductStageId,
           is_optional: productForm.is_optional,
           is_default_option: productForm.is_default_option,
+          default_coats: productForm.default_coats,
           min_coats: productForm.min_coats,
           max_coats: productForm.max_coats,
           has_pigment: productForm.has_pigment,
@@ -410,13 +464,22 @@ export function SystemsPage() {
           coverage_note: productForm.coverage_note.trim() || null,
           option_group: productForm.option_group.trim() || null,
           depends_on_product_id: productForm.depends_on_product_id || null,
+          shared_across_surfaces: productForm.shared_across_surfaces,
           display_order: maxOrder + 1,
         })
+        .select()
+        .single()
 
       if (error) {
         console.error('Insert error:', error)
         alert(`Error adding product: ${error.message}`)
       } else {
+        // Log activity
+        logCreate('product', data?.id || newProductId, `${productName} → ${selectedSystem.name}`, { 
+          system: selectedSystem.name,
+          option_group: productForm.option_group || null
+        })
+        
         await fetchSystemDetails(selectedSystem.id)
         closeProductModal()
       }
@@ -429,6 +492,7 @@ export function SystemsPage() {
         .update({
           is_optional: productForm.is_optional,
           is_default_option: productForm.is_default_option,
+          default_coats: productForm.default_coats,
           min_coats: productForm.min_coats,
           max_coats: productForm.max_coats,
           has_pigment: productForm.has_pigment,
@@ -437,6 +501,7 @@ export function SystemsPage() {
           coverage_note: productForm.coverage_note.trim() || null,
           option_group: productForm.option_group.trim() || null,
           depends_on_product_id: productForm.depends_on_product_id || null,
+          shared_across_surfaces: productForm.shared_across_surfaces,
         })
         .eq('id', editingProduct.id)
 
@@ -444,6 +509,13 @@ export function SystemsPage() {
         console.error('Update error:', error)
         alert(`Error updating product: ${error.message}`)
       } else {
+        // Log activity
+        logUpdate('product', editingProduct.id, `${editingProduct.product?.name} in ${selectedSystem.name}`, {
+          system: selectedSystem.name,
+          option_group: productForm.option_group || null,
+          shared_across_surfaces: productForm.shared_across_surfaces
+        })
+        
         await fetchSystemDetails(selectedSystem.id)
         closeProductModal()
       }
@@ -947,6 +1019,24 @@ export function SystemsPage() {
                   </div>
                 )}
 
+                {/* Shared across surfaces toggle */}
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-gray-900">Shared across surfaces</p>
+                    <p className="text-sm text-gray-500">In Floor+Wall mode, calculate for combined area</p>
+                  </div>
+                  <button
+                    onClick={() => setProductForm({ ...productForm, shared_across_surfaces: !productForm.shared_across_surfaces })}
+                    className={`w-14 h-7 rounded-full transition-colors relative ${
+                      productForm.shared_across_surfaces ? 'bg-purple-500' : 'bg-gray-300'
+                    }`}
+                  >
+                    <div className={`w-6 h-6 rounded-full bg-white shadow absolute top-0.5 transition-transform ${
+                      productForm.shared_across_surfaces ? 'translate-x-7' : 'translate-x-0.5'
+                    }`} />
+                  </button>
+                </div>
+
                 {/* Coats range */}
                 <div className="grid grid-cols-3 gap-3">
                   <div>
@@ -1011,11 +1101,57 @@ export function SystemsPage() {
                 {/* Option group */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Option group</label>
-                  <Input
-                    value={productForm.option_group}
-                    onChange={e => setProductForm({ ...productForm, option_group: e.target.value })}
-                    placeholder="e.g., dpm_type, mesh_type"
-                  />
+                  {(() => {
+                    // Get existing option groups from current system's products
+                    const existingGroups = [...new Set(
+                      systemProducts
+                        .map(sp => sp.option_group)
+                        .filter((g): g is string => !!g && g.trim() !== '')
+                    )].sort()
+                    
+                    const isNewGroup = productForm.option_group && 
+                      !existingGroups.includes(productForm.option_group) &&
+                      productForm.option_group !== ''
+                    
+                    return (
+                      <div className="space-y-2">
+                        <select
+                          value={isNewGroup ? '__new__' : productForm.option_group}
+                          onChange={e => {
+                            if (e.target.value === '__new__') {
+                              setProductForm({ ...productForm, option_group: '' })
+                            } else {
+                              setProductForm({ ...productForm, option_group: e.target.value })
+                            }
+                          }}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                        >
+                          <option value="">No group (standalone)</option>
+                          {existingGroups.map(group => (
+                            <option key={group} value={group}>{group}</option>
+                          ))}
+                          <option value="__new__">+ Create new group...</option>
+                        </select>
+                        
+                        {(isNewGroup || productForm.option_group === '') && existingGroups.length > 0 && (
+                          <Input
+                            value={isNewGroup ? productForm.option_group : ''}
+                            onChange={e => setProductForm({ ...productForm, option_group: e.target.value })}
+                            placeholder="Enter new group name"
+                            className="mt-2"
+                          />
+                        )}
+                        
+                        {existingGroups.length === 0 && (
+                          <Input
+                            value={productForm.option_group}
+                            onChange={e => setProductForm({ ...productForm, option_group: e.target.value })}
+                            placeholder="e.g., Pore Fillers, DPM Type"
+                          />
+                        )}
+                      </div>
+                    )
+                  })()}
                   <p className="text-xs text-gray-500 mt-1">Products with the same group become OR choices</p>
                 </div>
 
@@ -1272,7 +1408,7 @@ export function SystemsPage() {
       {showAddSystem && (
         <Card className="mb-6 border-2 border-dashed border-orange-300">
           <CardContent className="p-4">
-            <div className="grid sm:grid-cols-3 gap-3 mb-3">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
               <Input
                 placeholder="System name"
                 value={newSystem.name}
@@ -1284,6 +1420,16 @@ export function SystemsPage() {
                 onChange={e => setNewSystem({ ...newSystem, description: e.target.value })}
               />
               <select
+                value={newSystem.family}
+                onChange={e => setNewSystem({ ...newSystem, family: e.target.value })}
+                className="px-3 py-2 border border-gray-200 rounded-lg"
+              >
+                {existingFamilies.map(fam => (
+                  <option key={fam} value={fam}>{fam}</option>
+                ))}
+                <option value="__new__">+ Add new family...</option>
+              </select>
+              <select
                 value={newSystem.surface_type}
                 onChange={e => setNewSystem({ ...newSystem, surface_type: e.target.value as any })}
                 className="px-3 py-2 border border-gray-200 rounded-lg"
@@ -1293,6 +1439,16 @@ export function SystemsPage() {
                 <option value="both">Both</option>
               </select>
             </div>
+            {newSystem.family === '__new__' && (
+              <div className="mb-3">
+                <Input
+                  placeholder="Enter new family name"
+                  value={newFamilyName}
+                  onChange={e => setNewFamilyName(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            )}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowAddSystem(false)}>Cancel</Button>
               <Button onClick={createSystem}>Create</Button>
@@ -1311,13 +1467,32 @@ export function SystemsPage() {
               {editingSystemId === system.id ? (
                 // Edit mode
                 <div className="space-y-3">
-                  <Input
-                    value={editSystemName}
-                    onChange={e => setEditSystemName(e.target.value)}
-                    placeholder="System name"
-                    className="font-semibold"
-                    autoFocus
-                  />
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <Input
+                      value={editSystemName}
+                      onChange={e => setEditSystemName(e.target.value)}
+                      placeholder="System name"
+                      className="font-semibold"
+                      autoFocus
+                    />
+                    <select
+                      value={editSystemFamily}
+                      onChange={e => setEditSystemFamily(e.target.value)}
+                      className="px-3 py-2 border border-gray-200 rounded-lg"
+                    >
+                      {existingFamilies.map(fam => (
+                        <option key={fam} value={fam}>{fam}</option>
+                      ))}
+                      <option value="__new__">+ Add new family...</option>
+                    </select>
+                  </div>
+                  {editSystemFamily === '__new__' && (
+                    <Input
+                      placeholder="Enter new family name"
+                      value={editNewFamilyName}
+                      onChange={e => setEditNewFamilyName(e.target.value)}
+                    />
+                  )}
                   <Input
                     value={editSystemDescription}
                     onChange={e => setEditSystemDescription(e.target.value)}
@@ -1351,7 +1526,7 @@ export function SystemsPage() {
                 // Normal view
                 <div className="flex items-center justify-between">
                   <div className="flex-1 cursor-pointer" onClick={() => openSystem(system)}>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold text-gray-900">{system.name}</h3>
                       <span className={`px-2 py-0.5 text-xs rounded ${
                         system.surface_type === 'floor' ? 'bg-blue-100 text-blue-700' :
@@ -1360,6 +1535,11 @@ export function SystemsPage() {
                       }`}>
                         {system.surface_type}
                       </span>
+                      {system.family && (
+                        <span className="px-2 py-0.5 text-xs rounded bg-orange-100 text-orange-700">
+                          {system.family}
+                        </span>
+                      )}
                       {!system.is_active && (
                         <span className="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-500">inactive</span>
                       )}
