@@ -63,7 +63,7 @@ export function LoginPage() {
         {showReset ? (
           resetSent ? (
             <div className="text-center">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-12 h-12 bg-sage-tint rounded-full flex items-center justify-center mx-auto mb-4">
                 <Mail className="w-6 h-6 text-sage" />
               </div>
               <h2 className="text-lg font-medium text-basalt mb-2">Check your email</h2>

@@ -36,13 +36,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   // Block suspended users
   if (profile?.status === 'suspended') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-limestone">
         <div className="text-center p-8 bg-white rounded-xl shadow-sm max-w-md">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-danger-tint rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">🚫</span>
           </div>
-          <h1 className="text-xl font-bold text-gray-900 mb-2">Account Suspended</h1>
-          <p className="text-gray-600 mb-4">Your account has been suspended. Please contact support for assistance.</p>
+          <h1 className="text-xl font-bold text-basalt mb-2">Account Suspended</h1>
+          <p className="text-ink mb-4">Your account has been suspended. Please contact support for assistance.</p>
         </div>
       </div>
     )
@@ -190,7 +190,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-limestone">
           <AppRoutes />
         </div>
       </AuthProvider>

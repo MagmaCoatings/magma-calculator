@@ -26,14 +26,16 @@ interface SystemProduct {
   option_group: string | null
   is_default_option: boolean
   is_optional: boolean
-  coverage_sqm: number
+  coverage_sqm: number | null
   coverage_kg_per_sqm: number
-  default_coats: number
-  min_coats: number
-  max_coats: number
+  coverage_sqm_over_mesh?: number | null
+  default_coats: number | null
+  min_coats: number | null
+  max_coats: number | null
   has_pigment: boolean
   pigment_default_on: boolean
   depends_on_product_id: string | null
+  depends_on_product_ids?: string[] | null
   coverage_note: string | null
   display_order: number
   shared_across_surfaces: boolean
@@ -45,6 +47,12 @@ interface SystemProduct {
     pack_size: number
     pack_unit: string
     price: number
+    coverage_sqm?: number | null
+    coverage_sqm_over_mesh?: number | null
+    default_coats?: number | null
+    min_coats?: number | null
+    max_coats?: number | null
+    coverage_note?: string | null
   }
   stage: {
     id: string
@@ -52,6 +60,14 @@ interface SystemProduct {
     display_order: number
   }
 }
+
+// Effective values: a system_products override falls back to the product default.
+const effCoverage = (sp: SystemProduct) => sp.coverage_sqm ?? sp.product?.coverage_sqm ?? sp.product?.pack_size ?? 1
+const effOverMesh = (sp: SystemProduct) => sp.coverage_sqm_over_mesh ?? sp.product?.coverage_sqm_over_mesh ?? null
+const effDefCoats = (sp: SystemProduct) => sp.default_coats ?? sp.product?.default_coats ?? sp.min_coats ?? sp.product?.min_coats ?? 1
+const effMinCoats = (sp: SystemProduct) => sp.min_coats ?? sp.product?.min_coats ?? 1
+const effMaxCoats = (sp: SystemProduct) => sp.max_coats ?? sp.product?.max_coats ?? effDefCoats(sp)
+const effNote = (sp: SystemProduct) => sp.coverage_note ?? sp.product?.coverage_note ?? null
 
 interface LayerState {
   enabled: boolean
@@ -75,7 +91,7 @@ export function Calculator() {
   const [settingsApplied, setSettingsApplied] = useState(false)
 
   // Main state
-  const [surface, setSurface] = useState<'floor' | 'wall' | 'both'>('floor')
+  const [surface, setSurface] = useState<'floor' | 'wall' | 'both' | 'custom'>('floor')
   const [floorArea, setFloorArea] = useState<number | ''>(20)
   const [wallArea, setWallArea] = useState<number | ''>(10)
   const [wastagePercent, setWastagePercent] = useState<number | ''>(10)
@@ -86,7 +102,12 @@ export function Calculator() {
   const [floorProducts, setFloorProducts] = useState<SystemProduct[]>([])
   const [wallProducts, setWallProducts] = useState<SystemProduct[]>([])
   const [selectedColour, setSelectedColour] = useState({ name: 'Natural', hex: '#E8E4DC' })
-  
+
+  // Build Your Own (custom) builder
+  const [buildableProducts, setBuildableProducts] = useState<SystemProduct[]>([])
+  const [customArea, setCustomArea] = useState<number | ''>(20)
+  const [customLayers, setCustomLayers] = useState<{ [key: string]: { enabled: boolean; selectedProductId: string | null; area: number | ''; coats: number; pigment: boolean; application?: 'mesh' | 'standard' } }>({})
+
   // Custom colour state
   const [useCustomColour, setUseCustomColour] = useState(false)
   const [customColourName, setCustomColourName] = useState('')
@@ -120,20 +141,49 @@ export function Calculator() {
         return
       }
       
-      setSystems(data)
-      
-      // Extract unique families
-      const uniqueFamilies = [...new Set(data.map(s => s.family).filter(Boolean))] as string[]
+      // Separate the editable "Build Your Own" system from the normal Floor/Wall systems
+      const byoSystem = data.find(s => (s.family || '').toLowerCase() === 'build your own' || s.name.toLowerCase() === 'build your own')
+      const regularSystems = byoSystem ? data.filter(s => s.id !== byoSystem.id) : data
+      setSystems(regularSystems)
+
+      // Build Your Own source: the dedicated system if it exists, else every product deduped (fallback)
+      if (byoSystem) {
+        const { data: byoSp } = await supabase
+          .from('system_products')
+          .select('*, product:products(*), stage:stages(*)')
+          .eq('system_id', byoSystem.id)
+          .order('display_order')
+        setBuildableProducts(((byoSp as SystemProduct[]) || []).filter(sp => sp.product && !sp.product.name?.toLowerCase().includes('pigment')))
+      } else {
+        const { data: allSp } = await supabase
+          .from('system_products')
+          .select('*, product:products(*), stage:stages(*)')
+          .order('display_order')
+        if (allSp) {
+          const seen = new Set<string>()
+          const unique: SystemProduct[] = []
+          for (const sp of allSp as SystemProduct[]) {
+            if (!sp.product_id || seen.has(sp.product_id)) continue
+            if (sp.product?.name?.toLowerCase().includes('pigment')) continue
+            seen.add(sp.product_id)
+            unique.push(sp)
+          }
+          setBuildableProducts(unique)
+        }
+      }
+
+      // Extract unique families (excluding the Build Your Own system)
+      const uniqueFamilies = [...new Set(regularSystems.map(s => s.family).filter(Boolean))] as string[]
       setFamilies(uniqueFamilies)
-      
+
       // Auto-select first family if there are multiple
       const initialFamily = uniqueFamilies.length > 0 ? uniqueFamilies[0] : null
       setSelectedFamily(initialFamily)
-      
+
       // Filter by initial family
-      const familySystems = initialFamily 
-        ? data.filter(s => s.family === initialFamily)
-        : data
+      const familySystems = initialFamily
+        ? regularSystems.filter(s => s.family === initialFamily)
+        : regularSystems
       
       // Auto-select first floor and wall systems from filtered list
       const floorSystem = familySystems.find(s => s.surface_type === 'floor')
@@ -305,12 +355,12 @@ export function Calculator() {
         newStates[key] = {
           enabled: !sp.is_optional || sp.is_default_option,
           selectedProductId: isStandalone ? sp.product_id : (sp.is_default_option ? sp.product_id : null),
-          coats: sp.default_coats || sp.min_coats || 1,
+          coats: effDefCoats(sp),
           pigment: sp.has_pigment ? (sp.pigment_default_on !== false) : false,
         }
       } else if (sp.is_default_option) {
         newStates[key].selectedProductId = sp.product_id
-        newStates[key].coats = sp.default_coats || sp.min_coats || 1
+        newStates[key].coats = effDefCoats(sp)
         newStates[key].pigment = sp.has_pigment ? (sp.pigment_default_on !== false) : false
         if (sp.is_optional) {
           newStates[key].enabled = true
@@ -365,7 +415,7 @@ export function Calculator() {
         selectedProductId: productId,
         pigment: pigmentDefault,
         // Also update coats to the new product's defaults
-        coats: sp?.default_coats || sp?.min_coats || prev[key]?.coats || 1
+        coats: sp ? effDefCoats(sp) : (prev[key]?.coats || 1)
       }
     }))
   }
@@ -393,7 +443,7 @@ export function Calculator() {
       if (sp.product?.name?.toLowerCase().includes('pigment')) return
       
       const stageName = sp.stage?.name || 'Other'
-      const stageOrder = sp.stage?.display_order || 99
+      const stageOrder = sp.stage?.display_order ?? 99
       
       if (!stages[stageName]) {
         stages[stageName] = { stageOrder, layers: [] }
@@ -421,6 +471,78 @@ export function Calculator() {
     const floorAreaNum = floorArea === '' ? 0 : floorArea
     const wallAreaNum = wallArea === '' ? 0 : wallArea
     const wastageNum = wastagePercent === '' ? 0 : wastagePercent
+
+    // Build Your Own (custom) mode — à la carte from buildable products
+    if (surface === 'custom') {
+      const baseArea = customArea === '' ? 0 : customArea
+      let pigPacks = 0
+      const keyOf = (p: SystemProduct) => p.option_group || `p_${p.product_id}`
+      const triggerActive = (triggerSpId: string) => {
+        const tsp = buildableProducts.find(p => p.id === triggerSpId)
+        if (!tsp) return false
+        const ls = customLayers[keyOf(tsp)]
+        return !!ls?.enabled && (ls.selectedProductId ?? null) === tsp.product_id
+      }
+      const depsOk = (p: SystemProduct) => {
+        const trigs = [...(p.depends_on_product_id ? [p.depends_on_product_id] : []), ...(p.depends_on_product_ids || [])]
+        return trigs.length === 0 || trigs.some(triggerActive)
+      }
+      const sorted = [...buildableProducts].sort(
+        (a, b) => (a.stage?.display_order ?? 99) - (b.stage?.display_order ?? 99) || (a.display_order ?? 0) - (b.display_order ?? 0)
+      )
+      // Is any reinforcement mesh enabled? Used to auto-pick DPM "over mesh" coverage.
+      const meshEnabled = sorted.some(p => {
+        const ls = customLayers[keyOf(p)]
+        return !!ls?.enabled && (p.stage?.name || '').toLowerCase().includes('mesh')
+      })
+      const seenKeys = new Set<string>()
+      for (const rep of sorted) {
+        const key = keyOf(rep)
+        if (seenKeys.has(key)) continue
+        seenKeys.add(key)
+        const st = customLayers[key]
+        if (!st?.enabled) continue
+        if (!depsOk(rep)) continue
+        const group = sorted.filter(p => keyOf(p) === key)
+        const sp = group.find(p => p.product_id === (st.selectedProductId ?? '')) || group[0]
+        if (!sp.product) continue
+        const overrideArea = typeof st.area === 'number' && st.area > 0 ? st.area : 0
+        const resolvedArea = overrideArea > 0 ? overrideArea : (baseArea > 0 ? baseArea : 1)
+        const areaWithWastage = resolvedArea * (1 + wastageNum / 100)
+        const coats = st.coats || 1
+        // Dual-coverage products (e.g. DPM epoxy) carry a standard + over-mesh rate.
+        const stdCoverage = effCoverage(sp)
+        const overMesh = effOverMesh(sp)
+        const isDual = overMesh != null && overMesh !== stdCoverage
+        const application: 'mesh' | 'standard' = st.application ?? (meshEnabled ? 'mesh' : 'standard')
+        const coverage = isDual
+          ? (application === 'mesh' ? (overMesh as number) : stdCoverage)
+          : stdCoverage
+        const appSuffix = isDual ? (application === 'mesh' ? ' · over mesh' : ' · standard') : ''
+        // An enabled product always shows at least 1 pack — never vanishes while editing the area
+        const units = Math.max(1, Math.ceil((areaWithWastage * coats) / coverage))
+        items.push({
+          name: sp.product.name,
+          qty: (coats > 1 ? `${areaWithWastage.toFixed(1)}m² × ${coats} coats` : `${areaWithWastage.toFixed(1)}m²`) + appSuffix,
+          units,
+          unitSize: `${sp.product.pack_size}${sp.product.pack_unit}`,
+          cost: units * sp.product.price,
+          stageOrder: sp.stage?.display_order ?? 99,
+          productOrder: sp.display_order ?? 0,
+          surfaceType: 1,
+        })
+        if (st.pigment && sp.has_pigment) pigPacks += units
+      }
+      const isNatural = selectedColour.name.toLowerCase().includes('natural') || (useCustomColour && customColourName.toLowerCase().includes('natural'))
+      if (pigPacks > 0 && !isNatural) {
+        const colourName = useCustomColour ? (customColourName || 'Custom') : selectedColour.name
+        items.push({ name: `Pigment - ${colourName}`, qty: `${pigPacks} pot${pigPacks > 1 ? 's' : ''}`, units: pigPacks, unitSize: 'pot', cost: pigPacks * settings.pigment_price, stageOrder: 999, productOrder: 0, surfaceType: 3 })
+      }
+      items.sort((a, b) => a.stageOrder - b.stageOrder || a.productOrder - b.productOrder)
+      const subtotal = items.reduce((s, i) => s + i.cost, 0)
+      return { items, subtotal }
+    }
+
     const floorAreaWithWastage = floorAreaNum * (1 + wastageNum / 100)
     const wallAreaWithWastage = wallAreaNum * (1 + wastageNum / 100)
     const combinedAreaWithWastage = floorAreaWithWastage + wallAreaWithWastage
@@ -445,7 +567,17 @@ export function Calculator() {
 
         const sp = products.find(p => p.product_id === state.selectedProductId)
         if (!sp || !sp.product) return
-        
+
+        // Respect dependencies: skip in the calc if the product it depends on isn't selected
+        if (sp.depends_on_product_id) {
+          const depSp = products.find(p => p.id === sp.depends_on_product_id)
+          if (depSp) {
+            const depKey = prefix + (depSp.option_group || `standalone_${depSp.product_id}`)
+            const depState = layerStates[depKey]
+            if (!depState?.enabled || depState?.selectedProductId !== depSp.product_id) return
+          }
+        }
+
         // Handle shared products
         if (skipShared && sp.shared_across_surfaces) return
         if (isSharedPass && !sp.shared_across_surfaces) return
@@ -457,7 +589,7 @@ export function Calculator() {
         if (sp.product.name?.toLowerCase().includes('pigment')) return
 
         const coats = state.coats || 1
-        const coverage = sp.coverage_sqm || sp.product.pack_size
+        const coverage = effCoverage(sp)
         const areaWithCoats = area * coats
         const unitsNeeded = Math.ceil(areaWithCoats / coverage)
 
@@ -485,8 +617,8 @@ export function Calculator() {
           units: unitsNeeded,
           unitSize: `${sp.product.pack_size}${sp.product.pack_unit}`,
           cost: unitsNeeded * sp.product.price,
-          stageOrder: sp.stage?.display_order || 0,
-          productOrder: sp.display_order || 0,
+          stageOrder: sp.stage?.display_order ?? 99,
+          productOrder: sp.display_order ?? 0,
           surfaceType: isSharedPass ? 0 : (prefix === 'floor_' ? 1 : 2), // 0=shared, 1=floor, 2=wall
         })
 
@@ -581,7 +713,7 @@ export function Calculator() {
   const total = subtotal + vat
   const floorAreaNum = floorArea === '' ? 0 : floorArea
   const wallAreaNum = wallArea === '' ? 0 : wallArea
-  const totalArea = surface === 'floor' ? floorAreaNum : surface === 'wall' ? wallAreaNum : floorAreaNum + wallAreaNum
+  const totalArea = surface === 'custom' ? (customArea === '' ? 0 : customArea) : surface === 'floor' ? floorAreaNum : surface === 'wall' ? wallAreaNum : floorAreaNum + wallAreaNum
   const costPerM2 = totalArea > 0 ? subtotal / totalArea : 0
 
   // Map items for SaveQuoteModal
@@ -624,18 +756,17 @@ export function Calculator() {
       }
     }
     
-    const hasCoatOptions = selectedProduct && 
-      (selectedProduct.min_coats || 1) < (selectedProduct.max_coats || 1)
+    const selProdMin = selectedProduct ? effMinCoats(selectedProduct) : 1
+    const selProdMax = selectedProduct ? effMaxCoats(selectedProduct) : 1
+    const hasCoatOptions = selectedProduct && selProdMin < selProdMax
     const hasPigmentOption = selectedProduct?.has_pigment
     const showFullCard = state.enabled || !layer.isOptional || hasCoatOptions || hasPigmentOption
-    const fixedCoats = selectedProduct && 
-      (selectedProduct.min_coats || 1) === (selectedProduct.max_coats || 1) && 
-      (selectedProduct.min_coats || 1) > 1 
-        ? selectedProduct.min_coats 
+    const fixedCoats = selectedProduct && selProdMin === selProdMax && selProdMin > 1
+        ? selProdMin
         : null
 
     return (
-      <div key={layer.key} className={`bg-bone border border-line rounded-lg p-4 ${
+      <div key={`${stageName}__${layer.key}`} className={`bg-bone border border-line rounded-xl p-5 ${
         layer.isOptional && !state.enabled ? 'opacity-60' : ''
       }`}>
         {/* Layer header */}
@@ -649,8 +780,8 @@ export function Calculator() {
                 <InfoTip content={selectedProduct.product.description} />
               )}
             </p>
-            {selectedProduct?.coverage_note && (
-              <p className="text-xs text-stone mt-0.5">{selectedProduct.coverage_note}</p>
+            {selectedProduct && effNote(selectedProduct) && (
+              <p className="text-xs text-stone mt-0.5">{effNote(selectedProduct)}</p>
             )}
           </div>
           {layer.isOptional && (
@@ -679,7 +810,7 @@ export function Calculator() {
                       onClick={() => selectProduct(layer.key, sp.product_id)}
                       className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                         state.selectedProductId === sp.product_id
-                          ? 'bg-bone border-2 border-basalt text-basalt font-medium'
+                          ? 'bg-basalt text-bone border-2 border-basalt font-medium'
                           : 'bg-bone border border-line text-ink hover:border-stone'
                       }`}
                     >
@@ -702,15 +833,15 @@ export function Calculator() {
                     <span className="text-xs text-stone">Coats:</span>
                     <div className="flex gap-1">
                       {Array.from(
-                        { length: (selectedProduct.max_coats || 1) - (selectedProduct.min_coats || 1) + 1 },
-                        (_, i) => (selectedProduct.min_coats || 1) + i
+                        { length: selProdMax - selProdMin + 1 },
+                        (_, i) => selProdMin + i
                       ).map(num => (
                         <button
                           key={num}
                           onClick={() => setCoats(layer.key, num)}
                           className={`w-8 h-8 rounded-lg text-sm font-medium min-h-[44px] min-w-[44px] ${
                             state.coats === num
-                              ? 'bg-bone border-2 border-basalt text-basalt font-medium'
+                              ? 'bg-basalt text-bone border-2 border-basalt font-medium'
                               : 'bg-bone border border-line text-ink hover:border-stone'
                           }`}
                         >
@@ -815,6 +946,197 @@ export function Calculator() {
     )
   }
 
+  // Build Your Own helpers
+  function setCustomLayer(key: string, updates: Partial<{ enabled: boolean; selectedProductId: string | null; area: number | ''; coats: number; pigment: boolean; application: 'mesh' | 'standard' }>) {
+    setCustomLayers(prev => {
+      const existing = prev[key] || { enabled: false, selectedProductId: null, area: '' as number | '', coats: 1, pigment: false }
+      return { ...prev, [key]: { ...existing, ...updates } }
+    })
+  }
+
+  function renderBuildYourOwn() {
+    const keyOf = (p: SystemProduct) => p.option_group || `p_${p.product_id}`
+    const triggerActive = (triggerSpId: string) => {
+      const tsp = buildableProducts.find(p => p.id === triggerSpId)
+      if (!tsp) return false
+      const ls = customLayers[keyOf(tsp)]
+      return !!ls?.enabled && (ls.selectedProductId ?? null) === tsp.product_id
+    }
+    const depsOk = (p: SystemProduct) => {
+      const trigs = [...(p.depends_on_product_id ? [p.depends_on_product_id] : []), ...(p.depends_on_product_ids || [])]
+      return trigs.length === 0 || trigs.some(triggerActive)
+    }
+    const meshOn = buildableProducts.some(p => {
+      const ls = customLayers[keyOf(p)]
+      return !!ls?.enabled && (p.stage?.name || '').toLowerCase().includes('mesh')
+    })
+
+    // Group by stage, then by option-group / standalone, in build order
+    const stageList: { name: string; order: number; layers: { key: string; products: SystemProduct[] }[] }[] = []
+    const sorted = [...buildableProducts].sort((a, b) => (a.stage?.display_order ?? 99) - (b.stage?.display_order ?? 99) || (a.display_order ?? 0) - (b.display_order ?? 0))
+    sorted.forEach(sp => {
+      const stName = sp.stage?.name || 'Other'
+      let stg = stageList.find(s => s.name === stName)
+      if (!stg) { stg = { name: stName, order: sp.stage?.display_order ?? 99, layers: [] }; stageList.push(stg) }
+      const k = keyOf(sp)
+      let layer = stg.layers.find(l => l.key === k)
+      if (!layer) { layer = { key: k, products: [] }; stg.layers.push(layer) }
+      layer.products.push(sp)
+    })
+    stageList.sort((a, b) => a.order - b.order)
+
+    return (
+      <>
+        <div className="bg-bone border border-line rounded-xl p-5">
+          <p className="text-xs font-medium text-stone uppercase tracking-wide mb-1">Build your own system</p>
+          <p className="text-xs text-ash mb-4">Toggle on exactly the products you need. Set a default area below; override it per product where needed.</p>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-ink font-medium">Default area:</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={customArea}
+              onChange={e => setCustomArea(e.target.value === '' ? '' : parseFloat(e.target.value))}
+              onBlur={() => { if (customArea === '' || customArea <= 0) setCustomArea(1) }}
+              className="w-20 px-3 py-2 border border-line rounded-lg text-base text-center font-medium bg-bone min-h-[44px]"
+            />
+            <span className="text-sm text-stone">m²</span>
+            <span className="text-sm text-stone ml-2">Wastage:</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={wastagePercent}
+              onChange={e => setWastagePercent(e.target.value === '' ? '' : parseFloat(e.target.value))}
+              onBlur={() => { if (wastagePercent === '' || wastagePercent < 0) setWastagePercent(0) }}
+              className="w-16 px-2 py-2 border border-line rounded-lg text-base text-center bg-bone min-h-[44px]"
+            />
+            <span className="text-sm text-stone">%</span>
+          </div>
+        </div>
+
+        {stageList.map(stg => (
+          <div key={stg.name}>
+            <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3 px-1">{stg.name}</p>
+            <div className="space-y-4">
+              {stg.layers.map(layer => {
+                const reps = layer.products
+                if (!depsOk(reps[0])) return null
+                const st = customLayers[layer.key] || { enabled: false, selectedProductId: reps.length === 1 ? reps[0].product_id : null, area: '' as number | '', coats: 1, pigment: false }
+                const multi = reps.length > 1
+                const selected = reps.find(p => p.product_id === st.selectedProductId) || reps[0]
+                const selMin = effMinCoats(selected), selMax = effMaxCoats(selected)
+                const hasCoats = selMin < selMax
+                const selOverMesh = effOverMesh(selected), selStd = effCoverage(selected)
+                const isDual = selOverMesh != null && selOverMesh !== selStd
+                const effApp: 'mesh' | 'standard' = st.application ?? (meshOn ? 'mesh' : 'standard')
+                return (
+                  <div key={layer.key} className={`bg-bone border border-line rounded-xl p-5 ${!st.enabled ? 'opacity-60' : ''}`}>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-medium text-basalt">{selected.product?.name}</p>
+                        {effNote(selected) && <p className="text-xs text-stone mt-0.5">{effNote(selected)}</p>}
+                      </div>
+                      <button
+                        onClick={() => setCustomLayer(layer.key, { enabled: !st.enabled, selectedProductId: st.selectedProductId || reps[0].product_id, coats: st.enabled ? st.coats : effDefCoats(reps[0]) })}
+                        className={`w-12 h-6 rounded-full transition-colors relative shrink-0 ${st.enabled ? 'bg-sage' : 'bg-ash'}`}
+                        aria-label={`Toggle ${selected.product?.name}`}
+                      >
+                        <div className={`w-5 h-5 rounded-full bg-white shadow absolute top-0.5 transition-transform ${st.enabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                      </button>
+                    </div>
+                    {st.enabled && (
+                      <div className="mt-3 pt-3 border-t border-line-soft space-y-3">
+                        {multi && (
+                          <div className="flex flex-wrap gap-2">
+                            {reps.map(rep => (
+                              <button
+                                key={rep.product_id}
+                                onClick={() => setCustomLayer(layer.key, { selectedProductId: rep.product_id, coats: effDefCoats(rep) })}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-medium ${st.selectedProductId === rep.product_id ? 'bg-basalt text-bone border-2 border-basalt' : 'bg-bone border border-line text-ink hover:border-stone'}`}
+                              >
+                                {rep.product?.name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {isDual && (
+                          <div className="rounded-lg bg-track/60 border border-line p-3">
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <span className="text-xs font-medium text-ink">Application</span>
+                              <div className="flex gap-1.5">
+                                <button
+                                  onClick={() => setCustomLayer(layer.key, { application: 'mesh' })}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-medium ${effApp === 'mesh' ? 'bg-basalt text-bone border-2 border-basalt' : 'bg-bone border border-line text-ink hover:border-stone'}`}
+                                >
+                                  Over mesh
+                                </button>
+                                <button
+                                  onClick={() => setCustomLayer(layer.key, { application: 'standard' })}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-medium ${effApp === 'standard' ? 'bg-basalt text-bone border-2 border-basalt' : 'bg-bone border border-line text-ink hover:border-stone'}`}
+                                >
+                                  Standard
+                                </button>
+                              </div>
+                            </div>
+                            <p className="text-xs text-stone">
+                              {effApp === 'mesh'
+                                ? `Over mesh uses more epoxy (≈ ${selOverMesh} m²/pack).`
+                                : `Standard, no mesh (≈ ${selStd} m²/pack).`}
+                              {st.application == null && ` Auto-set from your mesh selection — tap to override.`}
+                            </p>
+                          </div>
+                        )}
+                        <div className="flex flex-wrap items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-stone">Area:</span>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              value={st.area}
+                              placeholder={String(customArea)}
+                              onChange={e => setCustomLayer(layer.key, { area: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+                              className="w-20 px-3 py-2 border border-line rounded-lg text-base text-center bg-bone min-h-[44px]"
+                            />
+                            <span className="text-xs text-stone">m²</span>
+                          </div>
+                          {hasCoats && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-stone">Coats:</span>
+                              {Array.from({ length: selMax - selMin + 1 }, (_, i) => selMin + i).map(n => (
+                                <button
+                                  key={n}
+                                  onClick={() => setCustomLayer(layer.key, { coats: n })}
+                                  className={`w-8 h-8 rounded-lg text-sm font-medium min-h-[44px] min-w-[44px] ${st.coats === n ? 'bg-basalt text-bone border-2 border-basalt' : 'bg-bone border border-line text-ink hover:border-stone'}`}
+                                >
+                                  {n}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {selected.has_pigment && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-stone">Add pigment:</span>
+                              <button
+                                onClick={() => setCustomLayer(layer.key, { pigment: !st.pigment })}
+                                className={`w-10 h-5 rounded-full transition-colors relative ${st.pigment ? 'bg-sage' : 'bg-ash'}`}
+                              >
+                                <div className={`w-4 h-4 rounded-full bg-white shadow absolute top-0.5 transition-transform ${st.pigment ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </>
+    )
+  }
+
   // Filter systems by surface type and family
   const availableSystems = systems.filter(s => {
     // First filter by family
@@ -852,24 +1174,25 @@ export function Calculator() {
           {/* Surface type */}
           <div className="bg-bone border border-line rounded-xl p-5">
             <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3">Surface type</p>
-            <div className="bg-limestone rounded-lg p-1 flex gap-1">
-              {(['floor', 'wall', 'both'] as const).map(s => (
+            <div className="bg-track rounded-lg p-1 flex flex-wrap gap-1">
+              {(['floor', 'wall', 'both', 'custom'] as const).map(s => (
                 <button
                   key={s}
                   onClick={() => setSurface(s)}
-                  className={`flex-1 py-2.5 px-4 rounded-md font-medium text-sm transition-all min-h-[44px] ${
+                  className={`flex-1 min-w-[78px] py-2.5 px-3 rounded-md font-medium text-sm transition-all min-h-[44px] ${
                     surface === s
                       ? 'bg-bone text-basalt shadow-sm'
                       : 'text-stone hover:text-ink'
                   }`}
                 >
-                  {s === 'floor' ? 'Floor' : s === 'wall' ? 'Wall' : 'Floor + Wall'}
+                  {s === 'floor' ? 'Floor' : s === 'wall' ? 'Wall' : s === 'both' ? 'Floor + Wall' : 'Build Your Own'}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Area */}
+          {/* Area (hidden in Build Your Own — it has its own area control) */}
+          {surface !== 'custom' && (
           <div className="bg-bone border border-line rounded-xl p-5">
             <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3">Area</p>
             <div className="flex flex-wrap items-center gap-4">
@@ -915,9 +1238,10 @@ export function Calculator() {
               </div>
             </div>
           </div>
+          )}
 
-          {/* Build type / System - shows separately for floor and wall in "both" mode */}
-          {surface === 'both' ? (
+          {/* Build type / System — Build Your Own replaces it entirely */}
+          {surface === 'custom' ? renderBuildYourOwn() : surface === 'both' ? (
             <>
               {/* Floor configuration */}
               <div className="bg-bone border border-line rounded-xl p-5">
@@ -926,7 +1250,7 @@ export function Calculator() {
                   <p className="text-sm font-medium text-ink">Floor configuration</p>
                 </div>
                 <p className="text-xs font-medium text-stone uppercase tracking-wide mb-2">Build type</p>
-                <div className="bg-limestone rounded-lg p-1 flex gap-1 mb-4">
+                <div className="bg-track rounded-lg p-1 flex gap-1 mb-4">
                   {systems.filter(s => s.surface_type === 'floor' && (!selectedFamily || s.family === selectedFamily)).map(system => (
                     <button
                       key={system.id}
@@ -953,7 +1277,7 @@ export function Calculator() {
                   <p className="text-sm font-medium text-ink">Wall configuration</p>
                 </div>
                 <p className="text-xs font-medium text-stone uppercase tracking-wide mb-2">Build type</p>
-                <div className="bg-limestone rounded-lg p-1 flex gap-1 mb-4">
+                <div className="bg-track rounded-lg p-1 flex gap-1 mb-4">
                   {systems.filter(s => s.surface_type === 'wall' && (!selectedFamily || s.family === selectedFamily)).map(system => (
                     <button
                       key={system.id}
@@ -978,7 +1302,7 @@ export function Calculator() {
               {/* Single surface mode */}
               <div className="bg-bone border border-line rounded-xl p-5">
                 <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3">Build type</p>
-                <div className="bg-limestone rounded-lg p-1 flex gap-1">
+                <div className="bg-track rounded-lg p-1 flex gap-1">
                   {availableSystems.map(system => (
                     <button
                       key={system.id}
@@ -996,9 +1320,9 @@ export function Calculator() {
               </div>
 
               {/* Layers */}
-              <div className="bg-bone border border-line rounded-xl p-5">
-                <p className="text-xs font-medium text-stone uppercase tracking-wide mb-4">Layers</p>
-                <div className="space-y-3">
+              <div>
+                <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3 px-1">Layers</p>
+                <div className="space-y-4">
                   {renderStageGroups(singleStageGroups as [string, { layers: any[] }][])}
                 </div>
               </div>
@@ -1009,26 +1333,10 @@ export function Calculator() {
           <div className="bg-bone border border-line rounded-xl p-5">
             <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3">Pigment colour</p>
             
-            {/* Natural / No Pigment option - always visible */}
-            <button
-              onClick={() => {
-                setSelectedColour({ name: 'Natural (No Pigment)', hex: '#F5F5F0' })
-                setUseCustomColour(false)
-              }}
-              className={`w-full mb-4 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all flex items-center justify-center gap-2 min-h-[44px] ${
-                selectedColour.name.toLowerCase().includes('natural') && !useCustomColour
-                  ? 'border-basalt bg-limestone'
-                  : 'border-line hover:border-stone'
-              }`}
-            >
-              <div className="w-5 h-5 rounded border border-stone" style={{ backgroundColor: '#F5F5F0' }} />
-              Natural (No Pigment)
-            </button>
-            
             <div className="space-y-3">
               {coloursByFamily.map(({ family, shades }) => (
                 <div key={family.id}>
-                  <p className="text-xs text-ash uppercase tracking-wide mb-2">{family.name}</p>
+                  <p className="text-xs text-ash uppercase tracking-wide mb-2">{family.name.toLowerCase() === 'natural' ? 'Natural - No Pigment' : family.name}</p>
                   <div className="flex flex-wrap gap-2">
                     {shades.map(swatch => (
                       <button
@@ -1037,10 +1345,10 @@ export function Calculator() {
                           setSelectedColour({ name: swatch.name, hex: swatch.hex_code })
                           setUseCustomColour(false)
                         }}
-                        className={`w-11 h-11 sm:w-9 sm:h-9 rounded-lg border-2 transition-all ${
+                        className={`w-12 h-12 rounded-lg border transition-all ${
                           selectedColour.name === swatch.name && !useCustomColour
-                            ? 'border-basalt scale-110'
-                            : 'border-transparent hover:scale-105'
+                            ? 'ring-2 ring-basalt ring-offset-2 ring-offset-bone border-transparent'
+                            : 'border-line hover:border-stone'
                         }`}
                         style={{ backgroundColor: swatch.hex_code }}
                         title={swatch.name}
@@ -1198,12 +1506,15 @@ export function Calculator() {
         </div>
       </div>
 
-      {/* Mobile sticky bottom bar - positioned above the tab nav */}
-      <div className="fixed bottom-16 left-0 right-0 bg-bone border-t border-line shadow-lg lg:hidden z-50">
+      {/* Mobile sticky bottom bar - positioned above the tab nav (incl. iOS safe area) */}
+      <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 bg-bone border-t border-line shadow-lg lg:hidden z-50">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-stone text-sm">Total</span>
-            <span className="text-xl font-medium text-basalt total-accent">£{formatCurrency(total)}</span>
+            <span className="text-xl font-medium text-basalt">
+              <span className="total-accent">£{formatCurrency(subtotal)}</span>
+              <span className="text-sm font-normal text-stone ml-1.5">+ VAT</span>
+            </span>
           </div>
           <div className="flex gap-2">
             <Button 

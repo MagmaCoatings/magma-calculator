@@ -43,10 +43,10 @@ export function AdminDashboard() {
   }
 
   const statCards = [
-    { label: 'Total Quotes', value: stats.totalQuotes, icon: FileText, href: '/quotes', color: 'text-blue-600 bg-blue-100' },
-    { label: 'Users', value: stats.totalUsers, icon: Users, href: '/admin/users', color: 'text-sage bg-green-100' },
-    { label: 'Products', value: stats.totalProducts, icon: Package, href: '/admin/products', color: 'text-purple-600 bg-purple-100' },
-    { label: 'Logins (7d)', value: stats.recentLogins, icon: Activity, href: '/admin/logs', color: 'text-molten-ink bg-orange-100' },
+    { label: 'Total Quotes', value: stats.totalQuotes, icon: FileText, href: '/quotes', color: 'text-molten-ink bg-molten-tint' },
+    { label: 'Users', value: stats.totalUsers, icon: Users, href: '/admin/users', color: 'text-sage bg-sage-tint' },
+    { label: 'Products', value: stats.totalProducts, icon: Package, href: '/admin/products', color: 'text-stone bg-track' },
+    { label: 'Logins (7d)', value: stats.recentLogins, icon: Activity, href: '/admin/logs', color: 'text-molten-ink bg-molten-tint' },
   ]
 
   if (loading) {

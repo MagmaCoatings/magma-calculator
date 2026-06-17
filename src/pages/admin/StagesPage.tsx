@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { logCreate, logUpdate, logDelete } from '@/lib/activityLog'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Layers, Plus, Pencil, Trash2, GripVertical } from 'lucide-react'
+import { Layers, Plus, Pencil, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 
 interface Stage {
   id: string
@@ -37,6 +37,29 @@ export function StagesPage() {
       setStages(data || [])
     }
     setLoading(false)
+  }
+
+  async function moveStage(id: string, direction: 'up' | 'down') {
+    const currentIndex = stages.findIndex(s => s.id === id)
+    if (currentIndex === -1) return
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+    if (newIndex < 0 || newIndex >= stages.length) return
+
+    const newStages = [...stages]
+    const temp = newStages[currentIndex]
+    newStages[currentIndex] = newStages[newIndex]
+    newStages[newIndex] = temp
+
+    setStages(newStages)
+
+    // Persist new order
+    for (let i = 0; i < newStages.length; i++) {
+      await supabase.from('stages').update({ display_order: i + 1 }).eq('id', newStages[i].id)
+    }
+
+    // Log the reorder in the audit trail
+    const moved = stages.find(s => s.id === id)
+    if (moved) logUpdate('stage', id, `${moved.name} (reordered ${direction})`)
   }
 
   async function addStage() {
@@ -166,7 +189,7 @@ export function StagesPage() {
       {/* Stages List */}
       {stages.length === 0 ? (
         <Card className="p-12 text-center">
-          <Layers className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <Layers className="w-12 h-12 text-ash mx-auto mb-4" />
           <h3 className="text-lg font-medium text-basalt mb-2">No stages defined</h3>
           <p className="text-stone mb-4">Stages define the order of product application</p>
           <Button onClick={() => setShowAddForm(true)}>
@@ -201,7 +224,24 @@ export function StagesPage() {
               ) : (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <GripVertical className="w-4 h-4 text-ash" />
+                    <div className="flex flex-col">
+                      <button
+                        onClick={() => moveStage(stage.id, 'up')}
+                        disabled={index === 0}
+                        className="text-ash hover:text-basalt disabled:opacity-30"
+                        aria-label="Move up"
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => moveStage(stage.id, 'down')}
+                        disabled={index === stages.length - 1}
+                        className="text-ash hover:text-basalt disabled:opacity-30"
+                        aria-label="Move down"
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                    </div>
                     <div className="w-8 h-8 rounded-full bg-molten/10 flex items-center justify-center text-sm font-bold text-molten-ink">
                       {index + 1}
                     </div>
@@ -217,7 +257,7 @@ export function StagesPage() {
                       <Pencil className="w-4 h-4" />
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => deleteStage(stage.id)}>
-                      <Trash2 className="w-4 h-4 text-red-500" />
+                      <Trash2 className="w-4 h-4 text-danger" />
                     </Button>
                   </div>
                 </div>

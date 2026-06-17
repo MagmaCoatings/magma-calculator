@@ -116,9 +116,9 @@ export function QuotesPage() {
       case 'draft':
         return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-line-soft text-ink"><Clock className="w-3 h-3" /> Draft</span>
       case 'sent':
-        return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-molten-ink"><FileText className="w-3 h-3" /> Sent</span>
+        return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-molten-tint text-molten-ink"><FileText className="w-3 h-3" /> Sent</span>
       case 'accepted':
-        return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-sage"><CheckCircle className="w-3 h-3" /> Accepted</span>
+        return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-sage-tint text-sage"><CheckCircle className="w-3 h-3" /> Accepted</span>
       case 'declined':
         return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-danger-tint text-danger"><XCircle className="w-3 h-3" /> Declined</span>
       default:
@@ -162,7 +162,7 @@ export function QuotesPage() {
           <input
             type="text"
             placeholder="Search by reference, client, project, or creator..."
-            className="w-full pl-10 pr-4 py-2 rounded-lg border border-line"
+            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-line bg-track text-base"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -187,7 +187,7 @@ export function QuotesPage() {
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 statusFilter === status
                   ? 'bg-charcoal text-white'
-                  : 'bg-line-soft text-ink hover:bg-gray-200'
+                  : 'bg-line-soft text-ink hover:bg-track'
               }`}
             >
               {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -200,7 +200,7 @@ export function QuotesPage() {
       {/* Quotes List */}
       {filteredQuotes.length === 0 ? (
         <Card className="p-12 text-center">
-          <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <FileText className="w-12 h-12 text-ash mx-auto mb-4" />
           <h3 className="text-lg font-medium text-basalt mb-2">No quotes found</h3>
           <p className="text-stone mb-4">
             {search || statusFilter !== 'all' 
@@ -260,7 +260,7 @@ export function QuotesPage() {
                       {quote.updated_at !== quote.created_at && (
                         <>
                           <span>•</span>
-                          <span className="text-orange-500">Updated</span>
+                          <span className="text-molten-ink">Updated</span>
                         </>
                       )}
                     </div>
@@ -270,7 +270,7 @@ export function QuotesPage() {
                       <div className="text-lg font-bold text-basalt">£{formatCurrency(quote.total)}</div>
                       <div className="text-xs text-ash">inc. VAT</div>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-gray-300" />
+                    <ChevronRight className="w-5 h-5 text-ash" />
                   </div>
                 </div>
               </Card>

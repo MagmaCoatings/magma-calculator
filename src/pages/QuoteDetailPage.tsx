@@ -506,9 +506,9 @@ Thank you...`
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="max-w-4xl mx-auto px-4 py-8 pb-28 lg:pb-8">
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>
           <button
             onClick={() => navigate('/quotes')}
@@ -594,9 +594,9 @@ Thank you...`
                   onClick={() => updateStatus(s.key)}
                   className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                     quote.status === s.key
-                      ? s.color === 'gray' ? 'bg-gray-200 text-ink'
-                      : s.color === 'blue' ? 'bg-blue-100 text-molten-ink'
-                      : s.color === 'green' ? 'bg-green-100 text-sage'
+                      ? s.color === 'gray' ? 'bg-track text-ink'
+                      : s.color === 'blue' ? 'bg-molten-tint text-molten-ink'
+                      : s.color === 'green' ? 'bg-sage-tint text-sage'
                       : 'bg-danger-tint text-danger'
                       : 'bg-limestone text-ash hover:bg-line-soft'
                   }`}
@@ -723,8 +723,8 @@ Thank you...`
         <CardContent className="p-0">
           {/* Smart calculation explanation */}
           {items.some(item => item.product_name.includes('✦')) && (
-            <div className="mx-4 mt-4 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
-              <p className="text-xs text-purple-700">
+            <div className="mx-4 mt-4 bg-molten-tint border border-line rounded-lg px-3 py-2">
+              <p className="text-xs text-stone">
                 <span className="font-medium">✦ Smart calculation:</span> These materials were calculated once for the combined floor + wall area — no need to buy separately for each surface.
               </p>
             </div>
@@ -776,7 +776,7 @@ Thank you...`
           )}
           
           <table className="w-full">
-            <thead className="bg-limestone border-b border-line-soft">
+            <thead className="bg-track border-b border-line">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-stone uppercase">Product</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-stone uppercase">Qty</th>
@@ -831,7 +831,7 @@ Thank you...`
                       <div className="flex gap-1 justify-end">
                         <button
                           onClick={() => startEditItem(item)}
-                          className="p-1 text-ash hover:text-blue-600 hover:bg-molten-tint rounded"
+                          className="p-1 text-ash hover:text-molten-ink hover:bg-molten-tint rounded"
                           title="Edit quantity"
                         >
                           <Pencil className="w-4 h-4" />
@@ -918,7 +918,7 @@ Thank you...`
                         </span>
                       )}
                       {entry.action === 'duplicated' && (
-                        <span className="text-blue-600">
+                        <span className="text-molten-ink">
                           Duplicated from <span className="font-medium">{entry.details?.sourceReference}</span>
                         </span>
                       )}

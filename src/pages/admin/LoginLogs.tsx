@@ -142,7 +142,7 @@ export function LoginLogsPage() {
           <input
             type="text"
             placeholder="Search by email, name, IP, city, or country..."
-            className="w-full pl-10 pr-4 py-2 rounded-lg border border-line"
+            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-line bg-track text-base"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -159,7 +159,7 @@ export function LoginLogsPage() {
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 successFilter === option.value
                   ? 'bg-charcoal text-white'
-                  : 'bg-line-soft text-ink hover:bg-gray-200'
+                  : 'bg-line-soft text-ink hover:bg-track'
               }`}
             >
               {option.label}
@@ -171,7 +171,7 @@ export function LoginLogsPage() {
       {/* Logs List */}
       {filteredLogs.length === 0 ? (
         <Card className="p-12 text-center">
-          <Activity className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <Activity className="w-12 h-12 text-ash mx-auto mb-4" />
           <h3 className="text-lg font-medium text-basalt mb-2">No logs found</h3>
           <p className="text-stone">Try adjusting your search or filters</p>
         </Card>
