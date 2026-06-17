@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Single Edge Function call for IP + geo (server-side)
       const location = await getClientLocation()
 
-      await supabase.from('login_logs').insert({
+      const { error } = await supabase.from('login_logs').insert({
         user_id: userId,
         ip_address: location?.ip || null,
         city: location?.city || null,
@@ -76,6 +76,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         os: getOS(),
         is_suspicious: false,
       })
+      // Supabase inserts return an error object (they don't throw on RLS/DB
+      // rejections), so check it explicitly — otherwise failures pass silently.
+      if (error) {
+        console.error('Login log insert failed:', error)
+        localStorage.removeItem(lockKey) // clear lock so a retry can re-log
+      }
     } catch (error) {
       console.error('Error logging login:', error)
       // Clear lock on error so retry works
