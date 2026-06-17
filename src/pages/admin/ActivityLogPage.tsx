@@ -102,8 +102,8 @@ export function ActivityLogPage() {
 
   function getActionColor(action: string) {
     switch (action) {
-      case 'create': return 'bg-sage-tint text-sage'
-      case 'update': return 'bg-molten-tint text-molten-ink'
+      case 'create': return 'bg-green-100 text-sage'
+      case 'update': return 'bg-blue-100 text-molten-ink'
       case 'delete': return 'bg-danger-tint text-danger'
       default: return 'bg-line-soft text-ink'
     }
@@ -136,7 +136,7 @@ export function ActivityLogPage() {
           <input
             type="text"
             placeholder="Search by name, user, or email..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-line bg-track text-base"
+            className="w-full pl-10 pr-4 py-2 rounded-lg border border-line"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -166,7 +166,7 @@ export function ActivityLogPage() {
       {/* Logs List */}
       {filteredLogs.length === 0 ? (
         <Card className="p-12 text-center">
-          <Activity className="w-12 h-12 text-ash mx-auto mb-4" />
+          <Activity className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-basalt mb-2">No activity found</h3>
           <p className="text-stone">Activity will appear here as users make changes</p>
         </Card>

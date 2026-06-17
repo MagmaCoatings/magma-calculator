@@ -27,13 +27,6 @@ export interface Product {
   is_active: boolean
   display_order: number
   created_at: string
-  // Coverage & coats defaults (inherited by systems unless overridden)
-  coverage_sqm: number | null
-  coverage_sqm_over_mesh: number | null
-  default_coats: number | null
-  min_coats: number | null
-  max_coats: number | null
-  coverage_note: string | null
 }
 
 export interface ProductCategory {

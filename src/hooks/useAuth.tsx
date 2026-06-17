@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
-import { supabase, getClientIP, getGeoFromIP, getDeviceType, getBrowser, getOS } from '@/lib/supabase'
+import { supabase, getClientLocation, getDeviceType, getBrowser, getOS } from '@/lib/supabase'
 import type { Profile } from '@/lib/types'
 
 interface AuthContextType {
@@ -61,24 +61,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(lockKey, now.toString())
 
     try {
-      const ip = await getClientIP()
-      const geo = ip ? await getGeoFromIP(ip) : {}
+      // Single Edge Function call for IP + geo (server-side)
+      const location = await getClientLocation()
 
-      const { error } = await supabase.from('login_logs').insert({
+      await supabase.from('login_logs').insert({
         user_id: userId,
-        ip_address: ip,
-        city: geo.city,
-        country: geo.country,
+        ip_address: location?.ip || null,
+        city: location?.city || null,
+        region: location?.region || null,
+        country: location?.country || null,
         user_agent: navigator.userAgent,
         device_type: getDeviceType(),
         browser: getBrowser(),
         os: getOS(),
         is_suspicious: false,
       })
-      if (error) {
-        console.error('Login log insert failed:', error)
-        localStorage.removeItem(lockKey)
-      }
     } catch (error) {
       console.error('Error logging login:', error)
       // Clear lock on error so retry works

@@ -7,27 +7,61 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const supabase = createClient<any>(supabaseUrl, supabaseAnonKey)
 
-// Helper functions for login logging
-export async function getClientIP(): Promise<string | null> {
+// Types for location data from Edge Function
+interface LocationData {
+  ip: string
+  city?: string
+  region?: string
+  country?: string
+  country_code?: string
+  timezone?: string
+  latitude?: number
+  longitude?: number
+}
+
+// Cache location to avoid repeated calls
+let cachedLocation: LocationData | null = null
+
+/**
+ * Get client location from Edge Function (server-side IP/geo lookup)
+ * More reliable than client-side as it gets real IP from request headers
+ */
+export async function getClientLocation(): Promise<LocationData | null> {
+  // Return cached if available
+  if (cachedLocation) return cachedLocation
+
   try {
-    const response = await fetch('https://api.ipify.org?format=json')
-    const data = await response.json()
-    return data.ip
-  } catch {
+    const { data, error } = await supabase.functions.invoke('get-location')
+    
+    if (error) {
+      console.warn('Edge function error:', error)
+      return null
+    }
+
+    if (data?.success && data?.location) {
+      cachedLocation = data.location
+      return data.location
+    }
+
+    return null
+  } catch (err) {
+    console.warn('Failed to get location:', err)
     return null
   }
 }
 
-export async function getGeoFromIP(ip: string): Promise<{ city?: string; country?: string }> {
-  try {
-    const response = await fetch(`https://ipapi.co/${ip}/json/`)
-    const data = await response.json()
-    return {
-      city: data.city,
-      country: data.country_name,
-    }
-  } catch {
-    return {}
+// Legacy functions for backward compatibility
+export async function getClientIP(): Promise<string | null> {
+  const location = await getClientLocation()
+  return location?.ip || null
+}
+
+export async function getGeoFromIP(_ip: string): Promise<{ city?: string; region?: string; country?: string }> {
+  const location = await getClientLocation()
+  return {
+    city: location?.city,
+    region: location?.region,
+    country: location?.country,
   }
 }
 

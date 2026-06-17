@@ -27,12 +27,6 @@ interface Product {
   name: string
   pack_size: number
   pack_unit: string
-  coverage_sqm?: number | null
-  coverage_sqm_over_mesh?: number | null
-  default_coats?: number | null
-  min_coats?: number | null
-  max_coats?: number | null
-  coverage_note?: string | null
 }
 
 interface SystemProduct {
@@ -96,12 +90,12 @@ interface PresetProductForm {
 interface SystemProductForm {
   is_optional: boolean
   is_default_option: boolean
-  default_coats: number | null
-  min_coats: number | null
-  max_coats: number | null
+  default_coats: number
+  min_coats: number
+  max_coats: number
   has_pigment: boolean
   pigment_default_on: boolean
-  coverage_sqm: number | null
+  coverage_sqm: number
   coverage_note: string
   option_group: string
   depends_on_product_id: string | null
@@ -144,12 +138,12 @@ export function SystemsPage() {
   const [productForm, setProductForm] = useState<SystemProductForm>({
     is_optional: false,
     is_default_option: false,
-    default_coats: null,
-    min_coats: null,
-    max_coats: null,
+    default_coats: 1,
+    min_coats: 1,
+    max_coats: 1,
     has_pigment: false,
     pigment_default_on: false,
-    coverage_sqm: null,
+    coverage_sqm: 0,
     coverage_note: '',
     option_group: '',
     depends_on_product_id: null,
@@ -382,12 +376,12 @@ export function SystemsPage() {
     setProductForm({
       is_optional: sp.is_optional,
       is_default_option: sp.is_default_option || false,
-      default_coats: sp.default_coats ?? null,
-      min_coats: sp.min_coats ?? null,
-      max_coats: sp.max_coats ?? null,
+      default_coats: sp.default_coats || sp.min_coats || 1,
+      min_coats: sp.min_coats || 1,
+      max_coats: sp.max_coats || 1,
       has_pigment: sp.has_pigment || false,
       pigment_default_on: sp.pigment_default_on !== false,
-      coverage_sqm: sp.coverage_sqm ?? null,
+      coverage_sqm: sp.coverage_sqm || 0,
       coverage_note: sp.coverage_note || '',
       option_group: sp.option_group || '',
       depends_on_product_id: sp.depends_on_product_id || '',
@@ -712,7 +706,7 @@ export function SystemsPage() {
         </button>
 
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-12 h-12 bg-molten-tint rounded-xl flex items-center justify-center">
+          <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
             <Layers className="w-6 h-6 text-molten-ink" />
           </div>
           <div>
@@ -789,9 +783,9 @@ export function SystemsPage() {
                               {pp.product?.name?.replace('Magma ', '')}
                             </span>
                             <span className="text-ash">×{pp.default_coats}</span>
-                            {pp.has_pigment && <Droplet className="w-3 h-3 text-molten-ink" />}
+                            {pp.has_pigment && <Droplet className="w-3 h-3 text-blue-500" />}
                             {idx < (preset.products?.length || 0) - 1 && (
-                              <span className="text-ash mx-1">→</span>
+                              <span className="text-gray-300 mx-1">→</span>
                             )}
                           </div>
                         ))}
@@ -841,7 +835,7 @@ export function SystemsPage() {
                           onClick={() => openProductEdit(sp)}
                           className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
                             sp.is_default_option
-                              ? 'bg-basalt text-white border-basalt hover:bg-ink'
+                              ? 'bg-gray-700 text-white border-gray-700 hover:bg-gray-600'
                               : 'bg-bone border-line hover:border-blue-400'
                           }`}
                         >
@@ -849,14 +843,14 @@ export function SystemsPage() {
                             {sp.product?.name?.replace('DPM Epoxy Primer ', '').replace('Fibreglass ', '').replace('PU Seal ', '')}
                           </span>
                           {sp.has_pigment && (
-                            <Droplet className={`w-3 h-3 ${sp.is_default_option ? 'text-ash' : 'text-molten-ink'}`} />
+                            <Droplet className={`w-3 h-3 ${sp.is_default_option ? 'text-blue-300' : 'text-blue-500'}`} />
                           )}
                           {(sp.max_coats || 1) > 1 && (
-                            <span className={`text-xs ${sp.is_default_option ? 'text-ash' : 'text-ash'}`}>
+                            <span className={`text-xs ${sp.is_default_option ? 'text-gray-300' : 'text-ash'}`}>
                               {sp.min_coats || 1}-{sp.max_coats || 1}
                             </span>
                           )}
-                          <Pencil className={`w-3 h-3 ${sp.is_default_option ? 'text-ash' : 'text-ash'}`} />
+                          <Pencil className={`w-3 h-3 ${sp.is_default_option ? 'text-ash' : 'text-gray-300'}`} />
                         </div>
                       ))}
                     </div>
@@ -928,7 +922,7 @@ export function SystemsPage() {
                     <button
                       type="button"
                       onClick={() => setShowNewStageModal(true)}
-                      className="px-3 py-2 bg-line-soft hover:bg-track rounded-lg text-sm font-medium text-ink"
+                      className="px-3 py-2 bg-line-soft hover:bg-gray-200 rounded-lg text-sm font-medium text-ink"
                     >
                       + New
                     </button>
@@ -960,7 +954,7 @@ export function SystemsPage() {
                   <button
                     onClick={() => setProductForm({ ...productForm, is_optional: !productForm.is_optional })}
                     className={`w-14 h-7 rounded-full transition-colors relative ${
-                      productForm.is_optional ? 'bg-sage' : 'bg-ash'
+                      productForm.is_optional ? 'bg-sage' : 'bg-gray-300'
                     }`}
                   >
                     <div className={`w-6 h-6 rounded-full bg-bone shadow absolute top-0.5 transition-transform ${
@@ -978,7 +972,7 @@ export function SystemsPage() {
                   <button
                     onClick={() => setProductForm({ ...productForm, is_default_option: !productForm.is_default_option })}
                     className={`w-14 h-7 rounded-full transition-colors relative ${
-                      productForm.is_default_option ? 'bg-amber-500' : 'bg-ash'
+                      productForm.is_default_option ? 'bg-amber-500' : 'bg-gray-300'
                     }`}
                   >
                     <div className={`w-6 h-6 rounded-full bg-bone shadow absolute top-0.5 transition-transform ${
@@ -996,7 +990,7 @@ export function SystemsPage() {
                   <button
                     onClick={() => setProductForm({ ...productForm, has_pigment: !productForm.has_pigment })}
                     className={`w-14 h-7 rounded-full transition-colors relative ${
-                      productForm.has_pigment ? 'bg-molten-tint0' : 'bg-ash'
+                      productForm.has_pigment ? 'bg-molten-tint0' : 'bg-gray-300'
                     }`}
                   >
                     <div className={`w-6 h-6 rounded-full bg-bone shadow absolute top-0.5 transition-transform ${
@@ -1015,7 +1009,7 @@ export function SystemsPage() {
                     <button
                       onClick={() => setProductForm({ ...productForm, pigment_default_on: !productForm.pigment_default_on })}
                       className={`w-14 h-7 rounded-full transition-colors relative ${
-                        productForm.pigment_default_on ? 'bg-sage' : 'bg-ash'
+                        productForm.pigment_default_on ? 'bg-sage' : 'bg-gray-300'
                       }`}
                     >
                       <div className={`w-6 h-6 rounded-full bg-bone shadow absolute top-0.5 transition-transform ${
@@ -1034,7 +1028,7 @@ export function SystemsPage() {
                   <button
                     onClick={() => setProductForm({ ...productForm, shared_across_surfaces: !productForm.shared_across_surfaces })}
                     className={`w-14 h-7 rounded-full transition-colors relative ${
-                      productForm.shared_across_surfaces ? 'bg-sage' : 'bg-ash'
+                      productForm.shared_across_surfaces ? 'bg-purple-500' : 'bg-gray-300'
                     }`}
                   >
                     <div className={`w-6 h-6 rounded-full bg-bone shadow absolute top-0.5 transition-transform ${
@@ -1043,22 +1037,15 @@ export function SystemsPage() {
                   </button>
                 </div>
 
-                {(() => {
-                  const dp = products.find(p => p.id === (editingProduct?.product_id || newProductId))
-                  const inheritLabel = (v: number | null | undefined) => v != null ? `Inherit (${v})` : 'Inherit'
-                  return (
-                <>
-                <p className="text-xs text-ash">Leave any of these on “Inherit” / blank to use the product’s default. Set a value only to override it for this system.</p>
                 {/* Coats range */}
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-ink mb-1">Default</label>
                     <select
-                      value={productForm.default_coats ?? ''}
-                      onChange={e => setProductForm({ ...productForm, default_coats: e.target.value === '' ? null : parseInt(e.target.value) })}
+                      value={productForm.default_coats}
+                      onChange={e => setProductForm({ ...productForm, default_coats: parseInt(e.target.value) })}
                       className="w-full px-3 py-2 border border-line rounded-lg"
                     >
-                      <option value="">{inheritLabel(dp?.default_coats)}</option>
                       {[1, 2, 3, 4].map(n => (
                         <option key={n} value={n}>{n}</option>
                       ))}
@@ -1067,11 +1054,10 @@ export function SystemsPage() {
                   <div>
                     <label className="block text-sm font-medium text-ink mb-1">Min</label>
                     <select
-                      value={productForm.min_coats ?? ''}
-                      onChange={e => setProductForm({ ...productForm, min_coats: e.target.value === '' ? null : parseInt(e.target.value) })}
+                      value={productForm.min_coats}
+                      onChange={e => setProductForm({ ...productForm, min_coats: parseInt(e.target.value) })}
                       className="w-full px-3 py-2 border border-line rounded-lg"
                     >
-                      <option value="">{inheritLabel(dp?.min_coats)}</option>
                       {[1, 2, 3, 4].map(n => (
                         <option key={n} value={n}>{n}</option>
                       ))}
@@ -1080,11 +1066,10 @@ export function SystemsPage() {
                   <div>
                     <label className="block text-sm font-medium text-ink mb-1">Max</label>
                     <select
-                      value={productForm.max_coats ?? ''}
-                      onChange={e => setProductForm({ ...productForm, max_coats: e.target.value === '' ? null : parseInt(e.target.value) })}
+                      value={productForm.max_coats}
+                      onChange={e => setProductForm({ ...productForm, max_coats: parseInt(e.target.value) })}
                       className="w-full px-3 py-2 border border-line rounded-lg"
                     >
-                      <option value="">{inheritLabel(dp?.max_coats)}</option>
                       {[1, 2, 3, 4].map(n => (
                         <option key={n} value={n}>{n}</option>
                       ))}
@@ -1097,9 +1082,9 @@ export function SystemsPage() {
                   <label className="block text-sm font-medium text-ink mb-1">Coverage (m² per pack)</label>
                   <Input
                     type="number"
-                    value={productForm.coverage_sqm ?? ''}
-                    onChange={e => setProductForm({ ...productForm, coverage_sqm: e.target.value === '' ? null : (parseFloat(e.target.value) || 0) })}
-                    placeholder={dp?.coverage_sqm != null ? `Inherits ${dp.coverage_sqm} m²/pack` : 'e.g., 20'}
+                    value={productForm.coverage_sqm || ''}
+                    onChange={e => setProductForm({ ...productForm, coverage_sqm: parseFloat(e.target.value) || 0 })}
+                    placeholder="e.g., 20"
                   />
                 </div>
 
@@ -1109,12 +1094,9 @@ export function SystemsPage() {
                   <Input
                     value={productForm.coverage_note}
                     onChange={e => setProductForm({ ...productForm, coverage_note: e.target.value })}
-                    placeholder={dp?.coverage_note || 'e.g., 1kg/m² = 20m² per 20kg pack'}
+                    placeholder="e.g., 1kg/m² = 20m² per 20kg pack"
                   />
                 </div>
-                </>
-                  )
-                })()}
 
                 {/* Option group */}
                 <div>
@@ -1318,7 +1300,7 @@ export function SystemsPage() {
                             <button
                               onClick={() => updatePresetProduct(idx, 'has_pigment', !pp.has_pigment)}
                               className={`p-1.5 rounded transition-colors ${
-                                pp.has_pigment ? 'bg-molten-tint text-molten-ink' : 'bg-line-soft text-ash'
+                                pp.has_pigment ? 'bg-blue-100 text-blue-600' : 'bg-line-soft text-ash'
                               }`}
                               title="Toggle pigment"
                             >
@@ -1373,7 +1355,7 @@ export function SystemsPage() {
 
                 {presetProducts.length > 0 && (
                   <div className="p-3 bg-molten-tint rounded-xl">
-                    <p className="text-xs text-molten-ink font-medium mb-2">Installer sees:</p>
+                    <p className="text-xs text-blue-600 font-medium mb-2">Installer sees:</p>
                     <div className="flex flex-wrap items-center gap-2">
                       {presetProducts.map((pp, idx) => {
                         const prod = products.find(p => p.id === pp.product_id)
@@ -1383,9 +1365,9 @@ export function SystemsPage() {
                               {prod?.name?.replace('Magma ', '')}
                             </span>
                             <span className="text-stone text-sm">×{pp.default_coats}</span>
-                            {pp.has_pigment && <Droplet className="w-3 h-3 text-molten-ink" />}
+                            {pp.has_pigment && <Droplet className="w-3 h-3 text-blue-500" />}
                             {idx < presetProducts.length - 1 && (
-                              <span className="text-ash mx-1">→</span>
+                              <span className="text-gray-300 mx-1">→</span>
                             )}
                           </div>
                         )
@@ -1546,11 +1528,15 @@ export function SystemsPage() {
                   <div className="flex-1 cursor-pointer" onClick={() => openSystem(system)}>
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-medium text-basalt">{system.name}</h3>
-                      <span className="px-2 py-0.5 text-xs rounded bg-track text-stone capitalize">
+                      <span className={`px-2 py-0.5 text-xs rounded ${
+                        system.surface_type === 'floor' ? 'bg-blue-100 text-molten-ink' :
+                        system.surface_type === 'wall' ? 'bg-green-100 text-sage' :
+                        'bg-purple-100 text-purple-700'
+                      }`}>
                         {system.surface_type}
                       </span>
                       {system.family && (
-                        <span className="px-2 py-0.5 text-xs rounded bg-molten-tint text-molten-ink">
+                        <span className="px-2 py-0.5 text-xs rounded bg-orange-100 text-molten-ink">
                           {system.family}
                         </span>
                       )}
@@ -1575,14 +1561,14 @@ export function SystemsPage() {
                       className="p-2 hover:bg-danger-tint rounded-lg"
                       title="Delete"
                     >
-                      <Trash2 className="w-4 h-4 text-danger" />
+                      <Trash2 className="w-4 h-4 text-red-400" />
                     </button>
                     <button
                       onClick={e => { e.stopPropagation(); toggleSystemActive(system) }}
                       className={`px-3 py-1.5 text-xs font-medium rounded-lg ${
                         system.is_active
-                          ? 'bg-sage-tint text-sage hover:bg-sage-tint'
-                          : 'bg-line-soft text-stone hover:bg-track'
+                          ? 'bg-green-100 text-sage hover:bg-green-200'
+                          : 'bg-line-soft text-stone hover:bg-gray-200'
                       }`}
                     >
                       {system.is_active ? 'Active' : 'Inactive'}

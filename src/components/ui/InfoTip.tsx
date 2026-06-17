@@ -48,7 +48,7 @@ export function InfoTip({ content, className = '' }: InfoTipProps) {
         onClick={() => setIsOpen(!isOpen)}
         onMouseEnter={() => setIsOpen(true)}
         onMouseLeave={() => setIsOpen(false)}
-        className="text-ash hover:text-ink focus:outline-none focus:text-ink transition-colors"
+        className="text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition-colors"
         aria-label="More information"
       >
         <Info className="w-4 h-4" />
@@ -60,14 +60,14 @@ export function InfoTip({ content, className = '' }: InfoTipProps) {
           className="absolute z-50 left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 sm:w-72"
           role="tooltip"
         >
-          <div className="bg-basalt text-white text-sm rounded-lg shadow-lg p-3 relative">
+          <div className="bg-gray-900 text-white text-sm rounded-lg shadow-lg p-3 relative">
             {/* Arrow */}
             <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-gray-900" />
             
             {/* Close button for mobile */}
             <button
               onClick={() => setIsOpen(false)}
-              className="absolute top-1 right-1 text-ash hover:text-white sm:hidden"
+              className="absolute top-1 right-1 text-gray-400 hover:text-white sm:hidden"
             >
               <X className="w-4 h-4" />
             </button>

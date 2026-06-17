@@ -189,7 +189,7 @@ export function UsersPage() {
           <input
             type="text"
             placeholder="Search by name, email, or company..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-line bg-track text-base"
+            className="w-full pl-10 pr-4 py-2 rounded-lg border border-line"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -208,7 +208,7 @@ export function UsersPage() {
       {/* Users List */}
       {filteredUsers.length === 0 ? (
         <Card className="p-12 text-center">
-          <Users className="w-12 h-12 text-ash mx-auto mb-4" />
+          <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-basalt mb-2">No users found</h3>
           <p className="text-stone">Try adjusting your search or filters</p>
         </Card>
@@ -224,7 +224,7 @@ export function UsersPage() {
                       <span className="text-sm text-stone">({user.company_name})</span>
                     )}
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      user.role === 'admin' ? 'bg-track text-stone' : 'bg-line-soft text-ink'
+                      user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-line-soft text-ink'
                     }`}>
                       {user.role}
                     </span>
