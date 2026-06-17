@@ -1,11 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
+// Generated DB types are available in ./database.types (run: supabase gen types typescript).
+// Not yet applied as the client generic — doing so surfaces ~45 interface mismatches
+// (nullable columns, narrowed unions like surface_type) that need a dedicated reconciliation pass.
+import type { Database } from './database.types'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-// Using untyped client - generates proper types later with `supabase gen types typescript`
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const supabase = createClient<any>(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient<Database | any>(supabaseUrl, supabaseAnonKey)
 
 // Types for location data from Edge Function
 interface LocationData {
