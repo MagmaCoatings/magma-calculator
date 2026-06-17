@@ -140,7 +140,7 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <div className="max-w-2xl mx-auto px-4 pt-8 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-basalt">My Profile</h1>
         <p className="text-stone text-sm mt-1">Manage your account details</p>

@@ -143,7 +143,7 @@ export function QuotesPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="max-w-6xl mx-auto px-4 pt-8 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-basalt">Quotes</h1>

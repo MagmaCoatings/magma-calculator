@@ -1528,7 +1528,17 @@ export function Calculator() {
               <ChevronUp className="w-4 h-4 mr-1" />
               Materials ({items.length})
             </Button>
-            <Button 
+            <Button
+              variant="outline"
+              className="min-h-[48px] px-3 shrink-0"
+              disabled={items.length === 0}
+              onClick={copyList}
+              aria-label="Copy materials list"
+              title="Copy list"
+            >
+              {copied ? <Check className="w-4 h-4 text-sage" /> : <Copy className="w-4 h-4" />}
+            </Button>
+            <Button
               className="flex-1 min-h-[48px]"
               disabled={items.length === 0}
               onClick={() => setShowSaveModal(true)}
