@@ -22,6 +22,12 @@ export function ProductsPage() {
     pack_unit: '',
     category_id: '',
     description: '',
+    coverage_sqm: '',
+    coverage_sqm_over_mesh: '',
+    default_coats: '',
+    min_coats: '',
+    max_coats: '',
+    coverage_note: '',
   })
   const [showAddForm, setShowAddForm] = useState(false)
   const [newProduct, setNewProduct] = useState({
@@ -73,6 +79,12 @@ export function ProductsPage() {
       pack_unit: product.pack_unit,
       category_id: product.category_id || '',
       description: product.description || '',
+      coverage_sqm: product.coverage_sqm != null ? String(product.coverage_sqm) : '',
+      coverage_sqm_over_mesh: product.coverage_sqm_over_mesh != null ? String(product.coverage_sqm_over_mesh) : '',
+      default_coats: product.default_coats != null ? String(product.default_coats) : '',
+      min_coats: product.min_coats != null ? String(product.min_coats) : '',
+      max_coats: product.max_coats != null ? String(product.max_coats) : '',
+      coverage_note: product.coverage_note || '',
     })
   }
 
@@ -91,6 +103,17 @@ export function ProductsPage() {
       return
     }
 
+    const num = (s: string) => { const v = parseFloat(s); return s.trim() === '' || isNaN(v) ? null : v }
+    const intNum = (s: string) => { const v = parseInt(s); return s.trim() === '' || isNaN(v) ? null : v }
+    const coverageFields = {
+      coverage_sqm: num(editForm.coverage_sqm),
+      coverage_sqm_over_mesh: num(editForm.coverage_sqm_over_mesh),
+      default_coats: intNum(editForm.default_coats),
+      min_coats: intNum(editForm.min_coats),
+      max_coats: intNum(editForm.max_coats),
+      coverage_note: editForm.coverage_note.trim() || null,
+    }
+
     const { error } = await supabase
       .from('products')
       .update({
@@ -101,6 +124,7 @@ export function ProductsPage() {
         pack_unit: editForm.pack_unit,
         category_id: editForm.category_id || null,
         description: editForm.description || null,
+        ...coverageFields,
       })
       .eq('id', id)
 
@@ -109,7 +133,7 @@ export function ProductsPage() {
     } else {
       // Log activity
       logUpdate('product', id, editForm.name, { price, pack_size })
-      
+
       setProducts(products.map(p => p.id === id ? {
         ...p,
         name: editForm.name,
@@ -119,6 +143,7 @@ export function ProductsPage() {
         pack_unit: editForm.pack_unit,
         category_id: editForm.category_id || null,
         description: editForm.description || null,
+        ...coverageFields,
       } : p))
       setEditingId(null)
       // Show saved feedback
@@ -572,7 +597,7 @@ export function ProductsPage() {
                     {/* Description row when editing */}
                     {editingId === product.id && (
                       <tr className="bg-molten-tint">
-                        <td colSpan={7} className="px-4 py-3">
+                        <td colSpan={7} className="px-4 py-3 space-y-4">
                           <div className="flex items-start gap-3">
                             <label className="text-sm font-medium text-ink pt-2 whitespace-nowrap">
                               Tooltip info:
@@ -584,6 +609,52 @@ export function ProductsPage() {
                               value={editForm.description}
                               onChange={e => setEditForm({ ...editForm, description: e.target.value })}
                             />
+                          </div>
+
+                          {/* Coverage & coats defaults — inherited by every system unless overridden */}
+                          <div>
+                            <p className="text-xs font-medium text-stone uppercase tracking-wide mb-2">
+                              Coverage &amp; coats defaults
+                              <span className="ml-2 normal-case font-normal text-ash">Used by all systems unless a system overrides it</span>
+                            </p>
+                            <div className="flex flex-wrap gap-4">
+                              <div>
+                                <label className="block text-xs text-stone mb-1">Coverage (m²/pack)</label>
+                                <Input type="number" className="w-32" placeholder="e.g. 20"
+                                  value={editForm.coverage_sqm}
+                                  onChange={e => setEditForm({ ...editForm, coverage_sqm: e.target.value })} />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-stone mb-1">Over-mesh coverage (m²/pack)</label>
+                                <Input type="number" className="w-40" placeholder="optional — DPM only"
+                                  value={editForm.coverage_sqm_over_mesh}
+                                  onChange={e => setEditForm({ ...editForm, coverage_sqm_over_mesh: e.target.value })} />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-stone mb-1">Default coats</label>
+                                <Input type="number" className="w-24" placeholder="1"
+                                  value={editForm.default_coats}
+                                  onChange={e => setEditForm({ ...editForm, default_coats: e.target.value })} />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-stone mb-1">Min coats</label>
+                                <Input type="number" className="w-24" placeholder="1"
+                                  value={editForm.min_coats}
+                                  onChange={e => setEditForm({ ...editForm, min_coats: e.target.value })} />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-stone mb-1">Max coats</label>
+                                <Input type="number" className="w-24" placeholder="1"
+                                  value={editForm.max_coats}
+                                  onChange={e => setEditForm({ ...editForm, max_coats: e.target.value })} />
+                              </div>
+                            </div>
+                            <div className="mt-3">
+                              <label className="block text-xs text-stone mb-1">Coverage note (shown under the product in the calculator)</label>
+                              <Input className="w-full" placeholder="e.g. 1kg/m² = 20m² per 20kg pack"
+                                value={editForm.coverage_note}
+                                onChange={e => setEditForm({ ...editForm, coverage_note: e.target.value })} />
+                            </div>
                           </div>
                         </td>
                       </tr>

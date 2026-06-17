@@ -27,6 +27,12 @@ interface Product {
   name: string
   pack_size: number
   pack_unit: string
+  coverage_sqm?: number | null
+  coverage_sqm_over_mesh?: number | null
+  default_coats?: number | null
+  min_coats?: number | null
+  max_coats?: number | null
+  coverage_note?: string | null
 }
 
 interface SystemProduct {
@@ -90,12 +96,12 @@ interface PresetProductForm {
 interface SystemProductForm {
   is_optional: boolean
   is_default_option: boolean
-  default_coats: number
-  min_coats: number
-  max_coats: number
+  default_coats: number | null
+  min_coats: number | null
+  max_coats: number | null
   has_pigment: boolean
   pigment_default_on: boolean
-  coverage_sqm: number
+  coverage_sqm: number | null
   coverage_note: string
   option_group: string
   depends_on_product_id: string | null
@@ -138,12 +144,12 @@ export function SystemsPage() {
   const [productForm, setProductForm] = useState<SystemProductForm>({
     is_optional: false,
     is_default_option: false,
-    default_coats: 1,
-    min_coats: 1,
-    max_coats: 1,
+    default_coats: null,
+    min_coats: null,
+    max_coats: null,
     has_pigment: false,
     pigment_default_on: false,
-    coverage_sqm: 0,
+    coverage_sqm: null,
     coverage_note: '',
     option_group: '',
     depends_on_product_id: null,
@@ -376,12 +382,12 @@ export function SystemsPage() {
     setProductForm({
       is_optional: sp.is_optional,
       is_default_option: sp.is_default_option || false,
-      default_coats: sp.default_coats || sp.min_coats || 1,
-      min_coats: sp.min_coats || 1,
-      max_coats: sp.max_coats || 1,
+      default_coats: sp.default_coats ?? null,
+      min_coats: sp.min_coats ?? null,
+      max_coats: sp.max_coats ?? null,
       has_pigment: sp.has_pigment || false,
       pigment_default_on: sp.pigment_default_on !== false,
-      coverage_sqm: sp.coverage_sqm || 0,
+      coverage_sqm: sp.coverage_sqm ?? null,
       coverage_note: sp.coverage_note || '',
       option_group: sp.option_group || '',
       depends_on_product_id: sp.depends_on_product_id || '',
@@ -1037,15 +1043,22 @@ export function SystemsPage() {
                   </button>
                 </div>
 
+                {(() => {
+                  const dp = products.find(p => p.id === (editingProduct?.product_id || newProductId))
+                  const inheritLabel = (v: number | null | undefined) => v != null ? `Inherit (${v})` : 'Inherit'
+                  return (
+                <>
+                <p className="text-xs text-ash">Leave any of these on “Inherit” / blank to use the product’s default. Set a value only to override it for this system.</p>
                 {/* Coats range */}
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-ink mb-1">Default</label>
                     <select
-                      value={productForm.default_coats}
-                      onChange={e => setProductForm({ ...productForm, default_coats: parseInt(e.target.value) })}
+                      value={productForm.default_coats ?? ''}
+                      onChange={e => setProductForm({ ...productForm, default_coats: e.target.value === '' ? null : parseInt(e.target.value) })}
                       className="w-full px-3 py-2 border border-line rounded-lg"
                     >
+                      <option value="">{inheritLabel(dp?.default_coats)}</option>
                       {[1, 2, 3, 4].map(n => (
                         <option key={n} value={n}>{n}</option>
                       ))}
@@ -1054,10 +1067,11 @@ export function SystemsPage() {
                   <div>
                     <label className="block text-sm font-medium text-ink mb-1">Min</label>
                     <select
-                      value={productForm.min_coats}
-                      onChange={e => setProductForm({ ...productForm, min_coats: parseInt(e.target.value) })}
+                      value={productForm.min_coats ?? ''}
+                      onChange={e => setProductForm({ ...productForm, min_coats: e.target.value === '' ? null : parseInt(e.target.value) })}
                       className="w-full px-3 py-2 border border-line rounded-lg"
                     >
+                      <option value="">{inheritLabel(dp?.min_coats)}</option>
                       {[1, 2, 3, 4].map(n => (
                         <option key={n} value={n}>{n}</option>
                       ))}
@@ -1066,10 +1080,11 @@ export function SystemsPage() {
                   <div>
                     <label className="block text-sm font-medium text-ink mb-1">Max</label>
                     <select
-                      value={productForm.max_coats}
-                      onChange={e => setProductForm({ ...productForm, max_coats: parseInt(e.target.value) })}
+                      value={productForm.max_coats ?? ''}
+                      onChange={e => setProductForm({ ...productForm, max_coats: e.target.value === '' ? null : parseInt(e.target.value) })}
                       className="w-full px-3 py-2 border border-line rounded-lg"
                     >
+                      <option value="">{inheritLabel(dp?.max_coats)}</option>
                       {[1, 2, 3, 4].map(n => (
                         <option key={n} value={n}>{n}</option>
                       ))}
@@ -1082,9 +1097,9 @@ export function SystemsPage() {
                   <label className="block text-sm font-medium text-ink mb-1">Coverage (m² per pack)</label>
                   <Input
                     type="number"
-                    value={productForm.coverage_sqm || ''}
-                    onChange={e => setProductForm({ ...productForm, coverage_sqm: parseFloat(e.target.value) || 0 })}
-                    placeholder="e.g., 20"
+                    value={productForm.coverage_sqm ?? ''}
+                    onChange={e => setProductForm({ ...productForm, coverage_sqm: e.target.value === '' ? null : (parseFloat(e.target.value) || 0) })}
+                    placeholder={dp?.coverage_sqm != null ? `Inherits ${dp.coverage_sqm} m²/pack` : 'e.g., 20'}
                   />
                 </div>
 
@@ -1094,9 +1109,12 @@ export function SystemsPage() {
                   <Input
                     value={productForm.coverage_note}
                     onChange={e => setProductForm({ ...productForm, coverage_note: e.target.value })}
-                    placeholder="e.g., 1kg/m² = 20m² per 20kg pack"
+                    placeholder={dp?.coverage_note || 'e.g., 1kg/m² = 20m² per 20kg pack'}
                   />
                 </div>
+                </>
+                  )
+                })()}
 
                 {/* Option group */}
                 <div>

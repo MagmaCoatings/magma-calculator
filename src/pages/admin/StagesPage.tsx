@@ -54,7 +54,7 @@ export function StagesPage() {
 
     // Persist new order
     for (let i = 0; i < newStages.length; i++) {
-      await supabase.from('stages').update({ display_order: i }).eq('id', newStages[i].id)
+      await supabase.from('stages').update({ display_order: i + 1 }).eq('id', newStages[i].id)
     }
 
     // Log the reorder in the audit trail
