@@ -258,7 +258,7 @@ export function QuotePDF({
             <Text style={styles.logo}>MAGMA COATINGS</Text>
             <Text style={styles.tagline}>Professional Microcement Solutions</Text>
           </View>
-          {company && (company.name || company.email) && (
+          {company && (company.name || company.email) ? (
             <View style={{ alignItems: 'flex-end', maxWidth: 240 }}>
               {company.name ? <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#111', textAlign: 'right' }}>{company.name}</Text> : null}
               {company.contactName ? <Text style={{ fontSize: 9, color: '#666', textAlign: 'right' }}>{company.contactName}</Text> : null}
@@ -268,7 +268,7 @@ export function QuotePDF({
               {company.email ? <Text style={{ fontSize: 8, color: '#666', textAlign: 'right' }}>{company.email}</Text> : null}
               {company.website ? <Text style={{ fontSize: 8, color: '#666', textAlign: 'right' }}>{company.website}</Text> : null}
             </View>
-          )}
+          ) : null}
         </View>
 
         {/* Quote Info */}
