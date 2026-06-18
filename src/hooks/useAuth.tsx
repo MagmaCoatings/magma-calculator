@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data
   }
 
-  async function logLogin(userId: string) {
+  async function logLogin(userId: string, email?: string | null) {
     // Prevent duplicate logs across tabs - check localStorage
     const lockKey = `login_lock_${userId}`
     const lastLogin = localStorage.getItem(lockKey)
@@ -66,6 +66,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const { error } = await supabase.from('login_logs').insert({
         user_id: userId,
+        email: email || null,
+        success: true,
         ip_address: location?.ip || null,
         city: location?.city || null,
         region: location?.region || null,
@@ -150,7 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Log login ONLY here - this only runs once per actual sign-in
     if (data.user) {
-      await logLogin(data.user.id)
+      await logLogin(data.user.id, data.user.email)
     }
 
     return {}
