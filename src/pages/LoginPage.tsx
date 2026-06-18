@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
 
 export function LoginPage() {
+  const { signIn } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -17,14 +19,15 @@ export function LoginPage() {
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    // Route through useAuth.signIn so the successful login gets recorded in login_logs
+    const { error } = await signIn(email, password)
 
     if (error) {
-      setError(error.message)
+      setError(error)
       await supabase.from('login_logs').insert({
         email,
         success: false,
-        failure_reason: error.message,
+        failure_reason: error,
       })
     }
     setLoading(false)

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { PDFDownloadLink } from '@react-pdf/renderer'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/hooks/useAuth'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -68,6 +69,7 @@ interface HistoryEntry {
 export function QuoteDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { profile, user } = useAuth()
   const [quote, setQuote] = useState<Quote | null>(null)
   const [items, setItems] = useState<QuoteItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -452,8 +454,27 @@ export function QuoteDetailPage() {
       `${item.quantity} × ${item.product_name} @ £${formatCurrency(item.unit_price)} each = £${formatCurrency(item.line_total)}`
     ).join('\n')
 
-    const subject = `Quote ${quote.reference}${quote.project_name ? ` - ${quote.project_name}` : ''}`
-    
+    const senderName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || profile?.full_name || ''
+    const company = profile?.company_name || ''
+
+    const subject = [`Quote ${quote.reference}`, quote.project_name, company].filter(Boolean).join(' - ')
+
+    // Sender's full company details (from their profile) for the footer
+    const addressLine = [profile?.address_line1, profile?.address_line2, profile?.address_line3, profile?.town_city, profile?.postcode]
+      .filter(Boolean).join(', ')
+    const details = [
+      senderName,
+      company,
+      addressLine,
+      profile?.phone ? `Tel: ${profile.phone}` : '',
+      profile?.mobile ? `Mobile: ${profile.mobile}` : '',
+      user?.email ? `Email: ${user.email}` : '',
+      profile?.website_url ? `Web: ${profile.website_url}` : '',
+      profile?.instagram_handle ? `Instagram: @${profile.instagram_handle.replace(/^@/, '')}` : '',
+      profile?.facebook_url ? `Facebook: ${profile.facebook_url}` : '',
+    ].filter(Boolean)
+    const signature = 'Thank you,\n\n' + details.join('\n')
+
     const body = `Could I please place the order for the following materials:
 
 QUOTE REFERENCE: ${quote.reference}
@@ -472,9 +493,9 @@ Total: £${formatCurrency(quote.total)}
 PALLET / DELIVERY COSTS: TBC
 (Quoted at time of order)
 
-Thank you...`
+${signature}`
 
-    const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+    const mailtoLink = `mailto:sales@magmacoatings.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
     window.location.href = mailtoLink
   }
 
@@ -536,6 +557,15 @@ Thank you...`
                 vat={quote.vat}
                 total={quote.total}
                 createdAt={quote.created_at}
+                company={{
+                  name: profile?.company_name || undefined,
+                  contactName: [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || profile?.full_name || undefined,
+                  address: [profile?.address_line1, profile?.address_line2, profile?.address_line3, profile?.town_city, profile?.postcode].filter(Boolean).join(', ') || undefined,
+                  phone: profile?.phone || undefined,
+                  mobile: profile?.mobile || undefined,
+                  email: user?.email || undefined,
+                  website: profile?.website_url || undefined,
+                }}
               />
             }
             fileName={`${quote.reference}.pdf`}

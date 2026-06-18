@@ -11,6 +11,19 @@ export interface Profile {
   show_tooltips?: boolean
   created_at: string
   updated_at: string
+  // Extended contact details (from the Profile page)
+  first_name?: string | null
+  last_name?: string | null
+  address_line1?: string | null
+  address_line2?: string | null
+  address_line3?: string | null
+  town_city?: string | null
+  postcode?: string | null
+  phone?: string | null
+  mobile?: string | null
+  instagram_handle?: string | null
+  facebook_url?: string | null
+  website_url?: string | null
 }
 
 export interface Product {

@@ -187,6 +187,16 @@ interface QuoteItem {
   display_order: number
 }
 
+interface CompanyDetails {
+  name?: string
+  contactName?: string
+  address?: string
+  phone?: string
+  mobile?: string
+  email?: string
+  website?: string
+}
+
 interface QuotePDFProps {
   reference: string
   clientName: string | null
@@ -200,6 +210,7 @@ interface QuotePDFProps {
   vat: number
   total: number
   createdAt: string
+  company?: CompanyDetails
 }
 
 export function QuotePDF({
@@ -215,6 +226,7 @@ export function QuotePDF({
   vat,
   total,
   createdAt,
+  company,
 }: QuotePDFProps) {
   const formatCurrency = (amount: number) => amount.toFixed(2)
   
@@ -241,9 +253,22 @@ export function QuotePDF({
     <Document>
       <Page size="A4" style={styles.page}>
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.logo}>MAGMA COATINGS</Text>
-          <Text style={styles.tagline}>Professional Microcement Solutions</Text>
+        <View style={[styles.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }]}>
+          <View>
+            <Text style={styles.logo}>MAGMA COATINGS</Text>
+            <Text style={styles.tagline}>Professional Microcement Solutions</Text>
+          </View>
+          {company && (company.name || company.email) && (
+            <View style={{ alignItems: 'flex-end', maxWidth: 240 }}>
+              {company.name ? <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#111', textAlign: 'right' }}>{company.name}</Text> : null}
+              {company.contactName ? <Text style={{ fontSize: 9, color: '#666', textAlign: 'right' }}>{company.contactName}</Text> : null}
+              {company.address ? <Text style={{ fontSize: 8, color: '#666', textAlign: 'right' }}>{company.address}</Text> : null}
+              {company.phone ? <Text style={{ fontSize: 8, color: '#666', textAlign: 'right' }}>Tel: {company.phone}</Text> : null}
+              {company.mobile ? <Text style={{ fontSize: 8, color: '#666', textAlign: 'right' }}>Mob: {company.mobile}</Text> : null}
+              {company.email ? <Text style={{ fontSize: 8, color: '#666', textAlign: 'right' }}>{company.email}</Text> : null}
+              {company.website ? <Text style={{ fontSize: 8, color: '#666', textAlign: 'right' }}>{company.website}</Text> : null}
+            </View>
+          )}
         </View>
 
         {/* Quote Info */}
