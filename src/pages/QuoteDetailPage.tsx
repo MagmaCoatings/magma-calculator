@@ -714,9 +714,9 @@ Thank you...`
 
       {/* Line Items */}
       <Card className="mt-6">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
           <CardTitle>Materials ({items.length} items)</CardTitle>
-          <Button variant="outline" size="sm" onClick={openAddProduct}>
+          <Button variant="outline" size="sm" onClick={openAddProduct} className="shrink-0">
             <Plus className="w-4 h-4 mr-1" /> Add Product
           </Button>
         </CardHeader>
@@ -775,81 +775,81 @@ Thank you...`
             </div>
           )}
           
-          <table className="w-full">
-            <thead className="bg-track border-b border-line">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-stone uppercase">Product</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-stone uppercase">Qty</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-stone uppercase">Unit Price</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-stone uppercase">Total</th>
-                <th className="px-4 py-3 w-20"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {items.map(item => (
-                <tr key={item.id}>
-                  <td className="px-4 py-3">
-                    <span className="font-medium text-basalt">{item.product_name}</span>
-                  </td>
-                  <td className="px-4 py-3 text-right text-ink">
-                    {editingItemId === item.id ? (
-                      <input
-                        type="number"
-                        min="1"
-                        value={editItemQty}
-                        onChange={e => setEditItemQty(parseInt(e.target.value) || 1)}
-                        className="w-16 px-2 py-1 text-right border border-stone rounded"
-                        autoFocus
-                      />
+          {/* Column header — desktop only */}
+          <div className="hidden sm:grid grid-cols-[1fr_4rem_6rem_6rem_4rem] gap-4 px-4 py-3 bg-track border-b border-line text-xs font-medium text-stone uppercase">
+            <span>Product</span>
+            <span className="text-right">Qty</span>
+            <span className="text-right">Unit Price</span>
+            <span className="text-right">Total</span>
+            <span></span>
+          </div>
+
+          <div className="divide-y divide-line-soft">
+            {items.map(item => {
+              const editing = editingItemId === item.id
+              const lineTotal = editing ? editItemQty * item.unit_price : item.line_total
+              return (
+                <div
+                  key={item.id}
+                  className="px-4 py-3 flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_4rem_6rem_6rem_4rem] sm:gap-4 sm:items-center"
+                >
+                  {/* Product name + actions (actions inline on mobile, separate column on desktop) */}
+                  <div className="flex items-start justify-between gap-3 min-w-0">
+                    <span className="font-medium text-basalt break-words min-w-0">{item.product_name}</span>
+                    <div className="flex gap-1 shrink-0 sm:hidden">
+                      {editing ? (
+                        <>
+                          <button onClick={() => saveItemEdit(item)} className="p-2 text-sage hover:bg-sage-tint rounded" title="Save"><Save className="w-4 h-4" /></button>
+                          <button onClick={() => setEditingItemId(null)} className="p-2 text-ash hover:bg-line-soft rounded" title="Cancel"><XCircle className="w-4 h-4" /></button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => startEditItem(item)} className="p-2 text-ash hover:text-molten-ink hover:bg-molten-tint rounded" title="Edit quantity"><Pencil className="w-4 h-4" /></button>
+                          <button onClick={() => deleteItem(item)} className="p-2 text-ash hover:text-danger hover:bg-danger-tint rounded" title="Remove item"><Trash2 className="w-4 h-4" /></button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Numbers row — inline on mobile, aligned columns on desktop */}
+                  <div className="flex items-center gap-4 text-sm text-stone sm:contents">
+                    <span className="sm:text-right sm:text-ink inline-flex items-center gap-1">
+                      <span className="sm:hidden">Qty:</span>
+                      {editing ? (
+                        <input
+                          type="number"
+                          min="1"
+                          value={editItemQty}
+                          onChange={e => setEditItemQty(parseInt(e.target.value) || 1)}
+                          className="w-16 px-2 py-1 text-right border border-stone rounded"
+                          autoFocus
+                        />
+                      ) : (
+                        <span className="text-ink font-medium sm:font-normal">{item.quantity}</span>
+                      )}
+                    </span>
+                    <span className="sm:text-right sm:text-ink">£{formatCurrency(item.unit_price)}<span className="sm:hidden"> each</span></span>
+                    <span className="ml-auto sm:ml-0 sm:text-right font-medium text-ink">£{formatCurrency(lineTotal)}</span>
+                  </div>
+
+                  {/* Actions — desktop column */}
+                  <div className="hidden sm:flex gap-1 justify-end">
+                    {editing ? (
+                      <>
+                        <button onClick={() => saveItemEdit(item)} className="p-1 text-sage hover:bg-sage-tint rounded" title="Save"><Save className="w-4 h-4" /></button>
+                        <button onClick={() => setEditingItemId(null)} className="p-1 text-ash hover:bg-line-soft rounded" title="Cancel"><XCircle className="w-4 h-4" /></button>
+                      </>
                     ) : (
-                      item.quantity
+                      <>
+                        <button onClick={() => startEditItem(item)} className="p-1 text-ash hover:text-molten-ink hover:bg-molten-tint rounded" title="Edit quantity"><Pencil className="w-4 h-4" /></button>
+                        <button onClick={() => deleteItem(item)} className="p-1 text-ash hover:text-danger hover:bg-danger-tint rounded" title="Remove item"><Trash2 className="w-4 h-4" /></button>
+                      </>
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-right text-ink">£{formatCurrency(item.unit_price)}</td>
-                  <td className="px-4 py-3 text-right font-medium">
-                    £{formatCurrency(editingItemId === item.id ? editItemQty * item.unit_price : item.line_total)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {editingItemId === item.id ? (
-                      <div className="flex gap-1 justify-end">
-                        <button
-                          onClick={() => saveItemEdit(item)}
-                          className="p-1 text-sage hover:bg-sage-tint rounded"
-                          title="Save"
-                        >
-                          <Save className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setEditingItemId(null)}
-                          className="p-1 text-ash hover:bg-line-soft rounded"
-                          title="Cancel"
-                        >
-                          <XCircle className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex gap-1 justify-end">
-                        <button
-                          onClick={() => startEditItem(item)}
-                          className="p-1 text-ash hover:text-molten-ink hover:bg-molten-tint rounded"
-                          title="Edit quantity"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => deleteItem(item)}
-                          className="p-1 text-ash hover:text-danger hover:bg-danger-tint rounded"
-                          title="Remove item"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </CardContent>
       </Card>
 
