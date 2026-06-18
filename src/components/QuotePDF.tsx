@@ -279,18 +279,18 @@ export function QuotePDF({
         {/* Client Details */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Details</Text>
-          {clientName && (
+          {clientName ? (
             <View style={styles.row}>
               <Text style={styles.label}>Client:</Text>
               <Text style={styles.value}>{clientName}</Text>
             </View>
-          )}
-          {projectName && (
+          ) : null}
+          {projectName ? (
             <View style={styles.row}>
               <Text style={styles.label}>Project:</Text>
               <Text style={styles.value}>{projectName}</Text>
             </View>
-          )}
+          ) : null}
           <View style={styles.row}>
             <Text style={styles.label}>Surface:</Text>
             <Text style={styles.value}>{surfaceType.charAt(0).toUpperCase() + surfaceType.slice(1)}</Text>
@@ -318,9 +318,9 @@ export function QuotePDF({
               <View key={index} style={index % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
                 <View style={styles.colProduct}>
                   <Text>{item.product_name}</Text>
-                  {item.product_code && (
+                  {item.product_code ? (
                     <Text style={{ color: '#999', fontSize: 8 }}>{item.product_code}</Text>
-                  )}
+                  ) : null}
                 </View>
                 <Text style={styles.colQty}>{item.quantity}</Text>
                 <Text style={styles.colPrice}>£{formatCurrency(item.unit_price)}</Text>
@@ -356,12 +356,12 @@ export function QuotePDF({
         </View>
 
         {/* Notes */}
-        {notes && (
+        {notes ? (
           <View style={styles.notes}>
             <Text style={styles.notesTitle}>Notes</Text>
             <Text style={styles.notesText}>{notes}</Text>
           </View>
-        )}
+        ) : null}
 
         {/* Delivery Note */}
         <View style={{ marginTop: 15, padding: 10, backgroundColor: '#fef3c7', borderRadius: 4 }}>
