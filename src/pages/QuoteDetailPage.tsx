@@ -580,9 +580,9 @@ Thank you...`
       {/* Status Bar */}
       <Card className="mb-6">
         <CardContent className="py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <span className="text-sm font-medium text-ink">Status:</span>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {[
                 { key: 'draft', label: 'Draft', icon: FileText, color: 'gray' },
                 { key: 'sent', label: 'Sent', icon: Send, color: 'blue' },
