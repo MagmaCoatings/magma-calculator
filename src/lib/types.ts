@@ -47,6 +47,7 @@ export interface Product {
   min_coats: number | null
   max_coats: number | null
   coverage_note: string | null
+  is_consumable?: boolean | null
 }
 
 export interface ProductCategory {

@@ -28,6 +28,7 @@ export function ProductsPage() {
     min_coats: '',
     max_coats: '',
     coverage_note: '',
+    is_consumable: false,
   })
   const [showAddForm, setShowAddForm] = useState(false)
   const [newProduct, setNewProduct] = useState({
@@ -85,6 +86,7 @@ export function ProductsPage() {
       min_coats: product.min_coats != null ? String(product.min_coats) : '',
       max_coats: product.max_coats != null ? String(product.max_coats) : '',
       coverage_note: product.coverage_note || '',
+      is_consumable: !!product.is_consumable,
     })
   }
 
@@ -112,6 +114,7 @@ export function ProductsPage() {
       min_coats: intNum(editForm.min_coats),
       max_coats: intNum(editForm.max_coats),
       coverage_note: editForm.coverage_note.trim() || null,
+      is_consumable: editForm.is_consumable,
     }
 
     const { error } = await supabase
@@ -655,6 +658,13 @@ export function ProductsPage() {
                                 value={editForm.coverage_note}
                                 onChange={e => setEditForm({ ...editForm, coverage_note: e.target.value })} />
                             </div>
+                            <label className="mt-4 flex items-center gap-2 cursor-pointer select-none">
+                              <input type="checkbox" className="w-4 h-4 accent-molten"
+                                checked={editForm.is_consumable}
+                                onChange={e => setEditForm({ ...editForm, is_consumable: e.target.checked })} />
+                              <span className="text-sm text-ink">Consumable</span>
+                              <span className="text-xs text-ash">— shows in the calculator's "Consumables / Extras" list (added by quantity, not area)</span>
+                            </label>
                           </div>
                         </td>
                       </tr>

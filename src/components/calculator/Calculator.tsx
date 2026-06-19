@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { formatCurrency } from '@/lib/formatters'
 import { Button } from '@/components/ui/button'
 import { InfoTip } from '@/components/ui/InfoTip'
-import { Copy, Check, ChevronUp } from 'lucide-react'
+import { Copy, Check, ChevronUp, ChevronDown, Package } from 'lucide-react'
 import { SaveQuoteModal } from '@/components/SaveQuoteModal'
 import { MagmaSpinner } from '@/components/brand/MagmaMark'
 
@@ -116,6 +116,11 @@ export function Calculator() {
   // Save quote modal
   const [showSaveModal, setShowSaveModal] = useState(false)
 
+  // Consumables (universal, admin-managed extras)
+  const [consumables, setConsumables] = useState<{ id: string; name: string; code: string; price: number; pack_size: number; pack_unit: string }[]>([])
+  const [consumableQtys, setConsumableQtys] = useState<{ [id: string]: number }>({})
+  const [showConsumables, setShowConsumables] = useState(false)
+
   // Layer states - keyed by stage name or option_group (prefixed with floor_/wall_ in both mode)
   const [layerStates, setLayerStates] = useState<{ [key: string]: LayerState }>({})
 
@@ -204,6 +209,11 @@ export function Calculator() {
 
   useEffect(() => {
     loadSystems()
+    // Load the universal consumables list (admin-managed)
+    supabase.from('products')
+      .select('id, name, code, price, pack_size, pack_unit')
+      .eq('is_consumable', true).eq('is_active', true).order('name')
+      .then(({ data }) => setConsumables(data || []))
   }, [])
 
   // Apply settings defaults once loaded
@@ -471,6 +481,23 @@ export function Calculator() {
     const floorAreaNum = floorArea === '' ? 0 : floorArea
     const wallAreaNum = wallArea === '' ? 0 : wallArea
     const wastageNum = wastagePercent === '' ? 0 : wastagePercent
+
+    // Universal consumables (manual quantity) — included in every quote regardless of surface
+    for (const c of consumables) {
+      const q = consumableQtys[c.id] || 0
+      if (q > 0) {
+        items.push({
+          name: c.name,
+          qty: `${q} × ${c.pack_size}${c.pack_unit}`,
+          units: q,
+          unitSize: `${c.pack_size}${c.pack_unit}`,
+          cost: q * c.price,
+          stageOrder: 998, // after materials, before pigment (999)
+          productOrder: 0,
+          surfaceType: 2,
+        })
+      }
+    }
 
     // Build Your Own (custom) mode — à la carte from buildable products
     if (surface === 'custom') {
@@ -1327,6 +1354,60 @@ export function Calculator() {
                 </div>
               </div>
             </>
+          )}
+
+          {/* Consumables / Extras — universal, collapsible */}
+          {consumables.length > 0 && (
+            <div className="bg-bone border border-line rounded-xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowConsumables(v => !v)}
+                className="w-full flex items-center justify-between gap-3 p-5 text-left"
+                aria-expanded={showConsumables}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Package className="w-4 h-4 text-stone shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-stone uppercase tracking-wide">Consumables / Extras</p>
+                    <p className="text-xs text-ash mt-0.5">
+                      {(() => { const n = Object.values(consumableQtys).filter(q => q > 0).length; return n > 0 ? `${n} added` : 'Sanding pads, discs & extras' })()}
+                    </p>
+                  </div>
+                </div>
+                <ChevronDown className={`w-5 h-5 text-stone shrink-0 transition-transform ${showConsumables ? 'rotate-180' : ''}`} />
+              </button>
+              {showConsumables && (
+                <div className="px-5 pb-5 pt-4 border-t border-line-soft space-y-3">
+                  {consumables.map(c => {
+                    const q = consumableQtys[c.id] || 0
+                    return (
+                      <div key={c.id} className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-basalt truncate">{c.name}</p>
+                          <p className="text-xs text-stone">£{formatCurrency(c.price)} / {c.pack_size}{c.pack_unit}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setConsumableQtys(p => ({ ...p, [c.id]: Math.max(0, (p[c.id] || 0) - 1) }))}
+                            className="w-10 h-10 rounded-lg border border-line text-ink hover:border-stone disabled:opacity-40"
+                            disabled={q === 0}
+                            aria-label={`Decrease ${c.name}`}
+                          >−</button>
+                          <span className="w-6 text-center text-sm font-medium tabular-nums">{q}</span>
+                          <button
+                            type="button"
+                            onClick={() => setConsumableQtys(p => ({ ...p, [c.id]: (p[c.id] || 0) + 1 }))}
+                            className="w-10 h-10 rounded-lg border border-line text-ink hover:border-stone"
+                            aria-label={`Increase ${c.name}`}
+                          >+</button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Colour picker */}
