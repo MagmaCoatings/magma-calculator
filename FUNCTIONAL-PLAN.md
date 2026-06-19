@@ -52,6 +52,10 @@ Two targets: **Vercel for staging/testing** (set up early), **your own hosting f
     - *you:* provision the server/host and run the deploy.
     - Decision to make: keep Vercel as production, or self-host fully — we can do either.
 
+## Feature ideas (backlog)
+
+- **Consumables (sanding pads, diamond discs)** — add a "Consumables" product category; give each a coverage rate (m² per disc/pad) and surface them as optional toggle items in a "Prep / Consumables" stage so quantity auto-calculates from the job area. Reuses the existing coverage calc + optional-toggle UI + admin — no new infrastructure. One-off items can use the quote's existing "Add Product".
+
 ## Parked
 
 - **Terrazzo colour system** — revisit later.
