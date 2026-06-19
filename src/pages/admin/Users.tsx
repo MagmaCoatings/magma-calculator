@@ -3,7 +3,8 @@ import { supabase } from '@/lib/supabase'
 import { logUpdate } from '@/lib/activityLog'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Users, Mail, Shield, ShieldOff, ChevronLeft, ChevronRight, Copy, ChevronDown, ChevronUp, Check } from 'lucide-react'
+import { Users, Mail, Shield, ShieldOff, ChevronLeft, ChevronRight, Copy, ChevronDown, ChevronUp, Check, UserPlus, X } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 
 const ITEMS_PER_PAGE = 20
 
@@ -38,6 +39,37 @@ export function UsersPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  // Invite-new-user form
+  const [showInvite, setShowInvite] = useState(false)
+  const [inviting, setInviting] = useState(false)
+  const [inviteResult, setInviteResult] = useState<{ ok: boolean; msg: string; credentials?: { email: string; password: string } } | null>(null)
+  const [newUser, setNewUser] = useState({ email: '', first_name: '', last_name: '', company_name: '', role: 'installer', mode: 'invite', password: '' })
+
+  async function inviteUser() {
+    if (!newUser.email.trim()) { setInviteResult({ ok: false, msg: 'Email is required' }); return }
+    setInviting(true)
+    setInviteResult(null)
+    const { data, error } = await supabase.functions.invoke('create-user', {
+      body: { ...newUser, redirect_to: `${window.location.origin}/reset-password` },
+    })
+    setInviting(false)
+    if (error || (data && data.error)) {
+      setInviteResult({ ok: false, msg: (data && data.error) || error?.message || 'Failed to create user' })
+      return
+    }
+    if (newUser.mode === 'password' && data?.password) {
+      setInviteResult({
+        ok: true,
+        msg: `Account created for ${newUser.email}. Send them these details:`,
+        credentials: { email: newUser.email, password: data.password },
+      })
+    } else {
+      setInviteResult({ ok: true, msg: `Invite sent to ${newUser.email}. They'll set their own password from the email.` })
+    }
+    setNewUser({ email: '', first_name: '', last_name: '', company_name: '', role: 'installer', mode: newUser.mode, password: '' })
+    fetchUsers()
+  }
 
   useEffect(() => {
     fetchUsers()
@@ -175,12 +207,105 @@ export function UsersPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-basalt">Users</h1>
           <p className="text-stone text-sm mt-1">{users.length} total users</p>
         </div>
+        <Button onClick={() => { setShowInvite(v => !v); setInviteResult(null) }} className="gap-2 shrink-0">
+          {showInvite ? <X className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+          {showInvite ? 'Cancel' : 'Invite User'}
+        </Button>
       </div>
+
+      {/* Invite new user */}
+      {showInvite && (
+        <Card className="p-5 mb-6 border-2 border-dashed border-molten/40">
+          <h3 className="font-medium text-basalt mb-1">Add a new user</h3>
+          <p className="text-stone text-sm mb-4">No one can sign up without being added here.</p>
+
+          {/* Mode selector */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => setNewUser({ ...newUser, mode: 'invite' })}
+              className={`px-3 py-2 rounded-lg text-sm font-medium border ${newUser.mode === 'invite' ? 'bg-basalt text-bone border-basalt' : 'bg-bone border-line text-ink hover:border-stone'}`}
+            >
+              Email invite (they set their password)
+            </button>
+            <button
+              type="button"
+              onClick={() => setNewUser({ ...newUser, mode: 'password' })}
+              className={`px-3 py-2 rounded-lg text-sm font-medium border ${newUser.mode === 'password' ? 'bg-basalt text-bone border-basalt' : 'bg-bone border-line text-ink hover:border-stone'}`}
+            >
+              Set a password &amp; send it personally
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2">
+              <label className="block text-sm text-ink mb-1">Email address *</label>
+              <Input type="email" placeholder="name@company.com" value={newUser.email}
+                onChange={e => setNewUser({ ...newUser, email: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-sm text-ink mb-1">First name</label>
+              <Input value={newUser.first_name} onChange={e => setNewUser({ ...newUser, first_name: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-sm text-ink mb-1">Last name</label>
+              <Input value={newUser.last_name} onChange={e => setNewUser({ ...newUser, last_name: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-sm text-ink mb-1">Company</label>
+              <Input value={newUser.company_name} onChange={e => setNewUser({ ...newUser, company_name: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-sm text-ink mb-1">Role</label>
+              <select className="w-full px-3 py-2 rounded-lg border border-line bg-bone min-h-[44px]"
+                value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })}>
+                <option value="installer">Installer</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+          </div>
+          {newUser.mode === 'password' && (
+            <div className="mt-3">
+              <label className="block text-sm text-ink mb-1">Password (leave blank to auto-generate)</label>
+              <Input value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} placeholder="Auto-generated if blank" />
+            </div>
+          )}
+
+          {inviteResult && (
+            <div className={`text-sm mt-4 p-3 rounded-lg ${inviteResult.ok ? 'bg-sage-tint text-sage' : 'bg-danger-tint text-danger'}`}>
+              <p>{inviteResult.msg}</p>
+              {inviteResult.credentials && (
+                <div className="mt-2 bg-bone border border-line rounded-lg p-3 text-ink">
+                  <p className="font-mono text-xs break-all">Login: {window.location.origin}</p>
+                  <p className="font-mono text-xs break-all">Email: {inviteResult.credentials.email}</p>
+                  <p className="font-mono text-xs break-all">Password: {inviteResult.credentials.password}</p>
+                  <Button
+                    variant="outline" size="sm" className="mt-2 gap-1"
+                    onClick={() => copyToClipboard(
+                      `Magma Calculator login:\n${window.location.origin}\nEmail: ${inviteResult.credentials!.email}\nPassword: ${inviteResult.credentials!.password}\n\nPlease change your password after logging in.`,
+                      'creds'
+                    )}
+                  >
+                    {copiedField === 'creds' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                    {copiedField === 'creds' ? 'Copied' : 'Copy details to send'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="flex gap-2 mt-4">
+            <Button onClick={inviteUser} disabled={inviting}>
+              {inviting ? 'Saving…' : (newUser.mode === 'password' ? 'Create user' : 'Send invite')}
+            </Button>
+            <Button variant="outline" onClick={() => setShowInvite(false)}>Close</Button>
+          </div>
+        </Card>
+      )}
 
       {/* Filters */}
       <div className="flex gap-4 mb-6">
