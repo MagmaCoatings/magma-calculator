@@ -376,6 +376,11 @@ export function ProductsPage() {
                     <option value="m">m</option>
                     <option value="pot">pot</option>
                     <option value="set">set</option>
+                    <option value="each">each</option>
+                    <option value="disc">disc</option>
+                    <option value="pad">pad</option>
+                    <option value="box">box</option>
+                    <option value="roll">roll</option>
                   </select>
                 </div>
               </div>
@@ -498,6 +503,11 @@ export function ProductsPage() {
                                 <option value="m">m</option>
                                 <option value="pot">pot</option>
                                 <option value="set">set</option>
+                                <option value="each">each</option>
+                                <option value="disc">disc</option>
+                                <option value="pad">pad</option>
+                                <option value="box">box</option>
+                                <option value="roll">roll</option>
                               </select>
                             </div>
                           </td>

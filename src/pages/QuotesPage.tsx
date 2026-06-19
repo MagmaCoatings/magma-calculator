@@ -52,22 +52,25 @@ export function QuotesPage() {
     if (error) {
       console.error('Error fetching quotes:', error)
     } else {
-      // Get creator info for each quote
-      const quotesWithCreators = await Promise.all((data || []).map(async (quote) => {
-        if (quote.created_by) {
-          const { data: creatorData } = await supabase
-            .from('profiles')
-            .select('full_name, email')
-            .eq('id', quote.created_by)
-            .single()
-          
-          if (creatorData) {
-            quote.creator_name = creatorData.full_name
-            quote.creator_email = creatorData.email
-          }
+      // Fetch all creator profiles in ONE query (dedup ids), then map — avoids N+1
+      const creatorIds = [...new Set((data || []).map(q => q.created_by).filter(Boolean))] as string[]
+      const creatorMap: { [id: string]: { full_name: string | null; email: string } } = {}
+      if (creatorIds.length) {
+        const { data: creators } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', creatorIds)
+        for (const c of creators || []) creatorMap[c.id] = { full_name: c.full_name, email: c.email }
+      }
+
+      const quotesWithCreators = (data || []).map(quote => {
+        const c = quote.created_by ? creatorMap[quote.created_by] : null
+        if (c) {
+          quote.creator_name = c.full_name
+          quote.creator_email = c.email
         }
         return quote
-      }))
+      })
 
       setQuotes(quotesWithCreators)
 

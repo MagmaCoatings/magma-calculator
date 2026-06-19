@@ -88,7 +88,17 @@ export function UsersPage() {
     if (error) {
       console.error('Error fetching users:', error)
     } else {
-      setUsers(data || [])
+      // Derive each user's last login from login_logs (profiles.last_login isn't written).
+      // One query, ordered newest-first, so the first row seen per user_id is their latest.
+      const { data: logs } = await supabase
+        .from('login_logs')
+        .select('user_id, logged_in_at')
+        .order('logged_in_at', { ascending: false })
+      const lastByUser: { [id: string]: string } = {}
+      for (const l of logs || []) {
+        if (l.user_id && !lastByUser[l.user_id]) lastByUser[l.user_id] = l.logged_in_at
+      }
+      setUsers((data || []).map(u => ({ ...u, last_login: lastByUser[u.id] ?? u.last_login ?? null })))
     }
     setLoading(false)
   }
