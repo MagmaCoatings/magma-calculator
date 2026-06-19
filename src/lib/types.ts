@@ -48,6 +48,9 @@ export interface Product {
   max_coats: number | null
   coverage_note: string | null
   is_consumable?: boolean | null
+  // Consumables only (physical extras): family grouping + minimum order qty
+  consumable_group?: string | null
+  consumable_min_order?: number | null
 }
 
 export interface ProductCategory {

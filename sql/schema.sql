@@ -98,6 +98,8 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS min_coats              integer;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS max_coats              integer;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS coverage_note          text;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS is_consumable          boolean DEFAULT false;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS consumable_group       text;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS consumable_min_order   integer;
 
 -- Per-system values become optional overrides (NULL = inherit the product default)
 ALTER TABLE system_products ALTER COLUMN coverage_sqm  DROP NOT NULL;

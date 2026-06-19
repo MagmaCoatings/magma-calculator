@@ -1,18 +1,19 @@
 -- ============================================
--- CONSUMABLES — universal, admin-managed extras (sanding pads, diamond discs…)
+-- CONSUMABLES — universal, admin-managed physical extras (discs, pads…)
 -- Run in Supabase SQL Editor. Safe + idempotent.
 --
--- Consumables are just products flagged is_consumable = true. They aren't tied
--- to any system; the calculator shows them as a universal "Consumables / Extras"
--- list the installer can add to a quote with a manual quantity.
+-- Consumables are products flagged is_consumable = true. Unlike microcement /
+-- resins they are NOT measured by coverage — they are physical stock bought by
+-- the unit (each), with a manual quantity in the calculator.
+--
+-- They support:
+--   * consumable_group     — family heading (e.g. 'STR Discs 430mm (silicon carbide)')
+--                            so grit variants group together in the calculator.
+--   * consumable_min_order — minimum order qty across the whole group (mix & match
+--                            any grits to reach it). NULL = no minimum.
 -- Manage them in Admin → Products (tick "Consumable").
 -- ============================================
 
-ALTER TABLE public.products ADD COLUMN IF NOT EXISTS is_consumable boolean DEFAULT false;
-
--- Example (optional) — uncomment to seed a couple:
--- INSERT INTO public.products (code, name, pack_size, pack_unit, price, is_consumable, is_active, display_order)
--- VALUES
---   ('disc_diamond', 'Diamond Grinding Disc', 1, 'disc', 35, true, true, 900),
---   ('pad_sanding',  'Sanding Pad',           1, 'pad',  6,  true, true, 901)
--- ON CONFLICT (code) DO NOTHING;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS is_consumable        boolean DEFAULT false;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS consumable_group     text;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS consumable_min_order integer;

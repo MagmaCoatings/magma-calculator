@@ -117,7 +117,7 @@ export function Calculator() {
   const [showSaveModal, setShowSaveModal] = useState(false)
 
   // Consumables (universal, admin-managed extras)
-  const [consumables, setConsumables] = useState<{ id: string; name: string; code: string; price: number; pack_size: number; pack_unit: string }[]>([])
+  const [consumables, setConsumables] = useState<{ id: string; name: string; code: string; price: number; pack_size: number; pack_unit: string; consumable_group: string | null; consumable_min_order: number | null }[]>([])
   const [consumableQtys, setConsumableQtys] = useState<{ [id: string]: number }>({})
   const [showConsumables, setShowConsumables] = useState(false)
 
@@ -211,9 +211,9 @@ export function Calculator() {
     loadSystems()
     // Load the universal consumables list (admin-managed)
     supabase.from('products')
-      .select('id, name, code, price, pack_size, pack_unit')
-      .eq('is_consumable', true).eq('is_active', true).order('name')
-      .then(({ data }) => setConsumables(data || []))
+      .select('id, name, code, price, pack_size, pack_unit, consumable_group, consumable_min_order')
+      .eq('is_consumable', true).eq('is_active', true).order('display_order')
+      .then(({ data }) => setConsumables((data as typeof consumables) || []))
   }, [])
 
   // Apply settings defaults once loaded
@@ -486,11 +486,12 @@ export function Calculator() {
     for (const c of consumables) {
       const q = consumableQtys[c.id] || 0
       if (q > 0) {
+        const unitSize = c.pack_size === 1 ? c.pack_unit : `${c.pack_size}${c.pack_unit}`
         items.push({
-          name: c.name,
-          qty: `${q} × ${c.pack_size}${c.pack_unit}`,
+          name: c.consumable_group ? `${c.consumable_group} — ${c.name}` : c.name,
+          qty: `${q} × ${unitSize}`,
           units: q,
-          unitSize: `${c.pack_size}${c.pack_unit}`,
+          unitSize,
           cost: q * c.price,
           stageOrder: 998, // after materials, before pigment (999)
           productOrder: 0,
@@ -1376,37 +1377,71 @@ export function Calculator() {
                 </div>
                 <ChevronDown className={`w-5 h-5 text-stone shrink-0 transition-transform ${showConsumables ? 'rotate-180' : ''}`} />
               </button>
-              {showConsumables && (
-                <div className="px-5 pb-5 pt-4 border-t border-line-soft space-y-3">
-                  {consumables.map(c => {
-                    const q = consumableQtys[c.id] || 0
-                    return (
-                      <div key={c.id} className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-basalt truncate">{c.name}</p>
-                          <p className="text-xs text-stone">£{formatCurrency(c.price)} / {c.pack_size}{c.pack_unit}</p>
+              {showConsumables && (() => {
+                // Group consumables by family (consumable_group); ungrouped items stand alone.
+                const order: string[] = []
+                const map: { [key: string]: { heading: string | null; minOrder: number | null; items: typeof consumables } } = {}
+                for (const c of consumables) {
+                  const key = c.consumable_group || `__solo_${c.id}`
+                  if (!map[key]) { map[key] = { heading: c.consumable_group, minOrder: null, items: [] }; order.push(key) }
+                  map[key].items.push(c)
+                  if (c.consumable_min_order != null) map[key].minOrder = c.consumable_min_order
+                }
+                return (
+                  <div className="px-5 pb-5 pt-4 border-t border-line-soft space-y-5">
+                    {order.map(key => {
+                      const group = map[key]
+                      const total = group.items.reduce((s, c) => s + (consumableQtys[c.id] || 0), 0)
+                      const under = group.minOrder != null && total > 0 && total < group.minOrder
+                      return (
+                        <div key={key} className="space-y-2.5">
+                          {group.heading && (
+                            <div className="flex items-baseline justify-between gap-2">
+                              <p className="text-sm font-semibold text-basalt">{group.heading}</p>
+                              {group.minOrder != null && (
+                                <span className="text-[11px] text-stone whitespace-nowrap shrink-0">Min {group.minOrder} · mix &amp; match</span>
+                              )}
+                            </div>
+                          )}
+                          {group.items.map(c => {
+                            const q = consumableQtys[c.id] || 0
+                            const unitSize = c.pack_size === 1 ? c.pack_unit : `${c.pack_size}${c.pack_unit}`
+                            return (
+                              <div key={c.id} className="flex items-center justify-between gap-3 pl-0.5">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium text-basalt truncate">{c.name}</p>
+                                  <p className="text-xs text-stone">£{formatCurrency(c.price)} / {unitSize}</p>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => setConsumableQtys(p => ({ ...p, [c.id]: Math.max(0, (p[c.id] || 0) - 1) }))}
+                                    className="w-10 h-10 rounded-lg border border-line text-ink hover:border-stone disabled:opacity-40"
+                                    disabled={q === 0}
+                                    aria-label={`Decrease ${c.consumable_group ? `${c.consumable_group} ` : ''}${c.name}`}
+                                  >−</button>
+                                  <span className="w-6 text-center text-sm font-medium tabular-nums">{q}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConsumableQtys(p => ({ ...p, [c.id]: (p[c.id] || 0) + 1 }))}
+                                    className="w-10 h-10 rounded-lg border border-line text-ink hover:border-stone"
+                                    aria-label={`Increase ${c.consumable_group ? `${c.consumable_group} ` : ''}${c.name}`}
+                                  >+</button>
+                                </div>
+                              </div>
+                            )
+                          })}
+                          {under && (
+                            <p className="text-xs text-molten-ink bg-molten-tint border border-molten/30 rounded-lg px-3 py-2">
+                              Add {group.minOrder! - total} more to meet the {group.minOrder} minimum order (any mix of grits).
+                            </p>
+                          )}
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => setConsumableQtys(p => ({ ...p, [c.id]: Math.max(0, (p[c.id] || 0) - 1) }))}
-                            className="w-10 h-10 rounded-lg border border-line text-ink hover:border-stone disabled:opacity-40"
-                            disabled={q === 0}
-                            aria-label={`Decrease ${c.name}`}
-                          >−</button>
-                          <span className="w-6 text-center text-sm font-medium tabular-nums">{q}</span>
-                          <button
-                            type="button"
-                            onClick={() => setConsumableQtys(p => ({ ...p, [c.id]: (p[c.id] || 0) + 1 }))}
-                            className="w-10 h-10 rounded-lg border border-line text-ink hover:border-stone"
-                            aria-label={`Increase ${c.name}`}
-                          >+</button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+                      )
+                    })}
+                  </div>
+                )
+              })()}
             </div>
           )}
 

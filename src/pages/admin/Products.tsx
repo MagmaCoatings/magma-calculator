@@ -29,6 +29,8 @@ export function ProductsPage() {
     max_coats: '',
     coverage_note: '',
     is_consumable: false,
+    consumable_group: '',
+    consumable_min_order: '',
   })
   const [showAddForm, setShowAddForm] = useState(false)
   const [newProduct, setNewProduct] = useState({
@@ -87,6 +89,8 @@ export function ProductsPage() {
       max_coats: product.max_coats != null ? String(product.max_coats) : '',
       coverage_note: product.coverage_note || '',
       is_consumable: !!product.is_consumable,
+      consumable_group: product.consumable_group || '',
+      consumable_min_order: product.consumable_min_order != null ? String(product.consumable_min_order) : '',
     })
   }
 
@@ -115,6 +119,8 @@ export function ProductsPage() {
       max_coats: intNum(editForm.max_coats),
       coverage_note: editForm.coverage_note.trim() || null,
       is_consumable: editForm.is_consumable,
+      consumable_group: editForm.is_consumable ? (editForm.consumable_group.trim() || null) : null,
+      consumable_min_order: editForm.is_consumable ? intNum(editForm.consumable_min_order) : null,
     }
 
     const { error } = await supabase
@@ -614,58 +620,87 @@ export function ProductsPage() {
                             />
                           </div>
 
-                          {/* Coverage & coats defaults — inherited by every system unless overridden */}
-                          <div>
-                            <p className="text-xs font-medium text-stone uppercase tracking-wide mb-2">
-                              Coverage &amp; coats defaults
-                              <span className="ml-2 normal-case font-normal text-ash">Used by all systems unless a system overrides it</span>
-                            </p>
-                            <div className="flex flex-wrap gap-4">
-                              <div>
-                                <label className="block text-xs text-stone mb-1">Coverage (m²/pack)</label>
-                                <Input type="number" className="w-32" placeholder="e.g. 20"
-                                  value={editForm.coverage_sqm}
-                                  onChange={e => setEditForm({ ...editForm, coverage_sqm: e.target.value })} />
+                          {/* Consumable toggle — physical extras are priced by quantity, not coverage */}
+                          <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" className="w-4 h-4 accent-molten"
+                              checked={editForm.is_consumable}
+                              onChange={e => setEditForm({ ...editForm, is_consumable: e.target.checked })} />
+                            <span className="text-sm text-ink">Consumable</span>
+                            <span className="text-xs text-ash">— a physical extra (disc, pad…) added by quantity, not coverage</span>
+                          </label>
+
+                          {!editForm.is_consumable ? (
+                            /* Coverage & coats defaults — inherited by every system unless overridden */
+                            <div>
+                              <p className="text-xs font-medium text-stone uppercase tracking-wide mb-2">
+                                Coverage &amp; coats defaults
+                                <span className="ml-2 normal-case font-normal text-ash">Used by all systems unless a system overrides it</span>
+                              </p>
+                              <div className="flex flex-wrap gap-4">
+                                <div>
+                                  <label className="block text-xs text-stone mb-1">Coverage (m²/pack)</label>
+                                  <Input type="number" className="w-32" placeholder="e.g. 20"
+                                    value={editForm.coverage_sqm}
+                                    onChange={e => setEditForm({ ...editForm, coverage_sqm: e.target.value })} />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-stone mb-1">Over-mesh coverage (m²/pack)</label>
+                                  <Input type="number" className="w-40" placeholder="optional — DPM only"
+                                    value={editForm.coverage_sqm_over_mesh}
+                                    onChange={e => setEditForm({ ...editForm, coverage_sqm_over_mesh: e.target.value })} />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-stone mb-1">Default coats</label>
+                                  <Input type="number" className="w-24" placeholder="1"
+                                    value={editForm.default_coats}
+                                    onChange={e => setEditForm({ ...editForm, default_coats: e.target.value })} />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-stone mb-1">Min coats</label>
+                                  <Input type="number" className="w-24" placeholder="1"
+                                    value={editForm.min_coats}
+                                    onChange={e => setEditForm({ ...editForm, min_coats: e.target.value })} />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-stone mb-1">Max coats</label>
+                                  <Input type="number" className="w-24" placeholder="1"
+                                    value={editForm.max_coats}
+                                    onChange={e => setEditForm({ ...editForm, max_coats: e.target.value })} />
+                                </div>
                               </div>
-                              <div>
-                                <label className="block text-xs text-stone mb-1">Over-mesh coverage (m²/pack)</label>
-                                <Input type="number" className="w-40" placeholder="optional — DPM only"
-                                  value={editForm.coverage_sqm_over_mesh}
-                                  onChange={e => setEditForm({ ...editForm, coverage_sqm_over_mesh: e.target.value })} />
-                              </div>
-                              <div>
-                                <label className="block text-xs text-stone mb-1">Default coats</label>
-                                <Input type="number" className="w-24" placeholder="1"
-                                  value={editForm.default_coats}
-                                  onChange={e => setEditForm({ ...editForm, default_coats: e.target.value })} />
-                              </div>
-                              <div>
-                                <label className="block text-xs text-stone mb-1">Min coats</label>
-                                <Input type="number" className="w-24" placeholder="1"
-                                  value={editForm.min_coats}
-                                  onChange={e => setEditForm({ ...editForm, min_coats: e.target.value })} />
-                              </div>
-                              <div>
-                                <label className="block text-xs text-stone mb-1">Max coats</label>
-                                <Input type="number" className="w-24" placeholder="1"
-                                  value={editForm.max_coats}
-                                  onChange={e => setEditForm({ ...editForm, max_coats: e.target.value })} />
+                              <div className="mt-3">
+                                <label className="block text-xs text-stone mb-1">Coverage note (shown under the product in the calculator)</label>
+                                <Input className="w-full" placeholder="e.g. 1kg/m² = 20m² per 20kg pack"
+                                  value={editForm.coverage_note}
+                                  onChange={e => setEditForm({ ...editForm, coverage_note: e.target.value })} />
                               </div>
                             </div>
-                            <div className="mt-3">
-                              <label className="block text-xs text-stone mb-1">Coverage note (shown under the product in the calculator)</label>
-                              <Input className="w-full" placeholder="e.g. 1kg/m² = 20m² per 20kg pack"
-                                value={editForm.coverage_note}
-                                onChange={e => setEditForm({ ...editForm, coverage_note: e.target.value })} />
+                          ) : (
+                            /* Consumable details — group + minimum order (no coverage) */
+                            <div>
+                              <p className="text-xs font-medium text-stone uppercase tracking-wide mb-2">
+                                Consumable details
+                                <span className="ml-2 normal-case font-normal text-ash">Shown in the calculator's "Consumables / Extras" list</span>
+                              </p>
+                              <div className="flex flex-wrap gap-4">
+                                <div>
+                                  <label className="block text-xs text-stone mb-1">Group / family <span className="text-ash">(optional)</span></label>
+                                  <Input className="w-72" placeholder="e.g. STR Discs 430mm (silicon carbide)"
+                                    value={editForm.consumable_group}
+                                    onChange={e => setEditForm({ ...editForm, consumable_group: e.target.value })} />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-stone mb-1">Min order qty <span className="text-ash">(optional)</span></label>
+                                  <Input type="number" className="w-28" placeholder="e.g. 10"
+                                    value={editForm.consumable_min_order}
+                                    onChange={e => setEditForm({ ...editForm, consumable_min_order: e.target.value })} />
+                                </div>
+                              </div>
+                              <p className="text-xs text-ash mt-2">
+                                Variants sharing a Group appear together (set the name to the grit/type, e.g. "40g"). Min order applies across the whole group — mix &amp; match. Price is per unit; set Pack size to 1 and unit to "each".
+                              </p>
                             </div>
-                            <label className="mt-4 flex items-center gap-2 cursor-pointer select-none">
-                              <input type="checkbox" className="w-4 h-4 accent-molten"
-                                checked={editForm.is_consumable}
-                                onChange={e => setEditForm({ ...editForm, is_consumable: e.target.checked })} />
-                              <span className="text-sm text-ink">Consumable</span>
-                              <span className="text-xs text-ash">— shows in the calculator's "Consumables / Extras" list (added by quantity, not area)</span>
-                            </label>
-                          </div>
+                          )}
                         </td>
                       </tr>
                     )}
