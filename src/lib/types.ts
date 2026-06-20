@@ -158,6 +158,7 @@ export interface SystemProduct {
   coverage_kg_per_sqm: number | null
   coverage_sqm_per_pack: number | null
   option_group: string | null
+  group_label: string | null
   is_default_option: boolean
   coverage_note: string | null
   has_pigment: boolean

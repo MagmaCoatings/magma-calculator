@@ -48,6 +48,7 @@ interface SystemProduct {
   pigment_default_on: boolean
   is_optional: boolean
   option_group: string | null
+  group_label?: string | null
   is_default_option: boolean
   coverage_note: string | null
   display_order: number
@@ -104,6 +105,7 @@ interface SystemProductForm {
   coverage_sqm: number | null
   coverage_note: string
   option_group: string
+  group_label: string
   depends_on_product_id: string | null
   shared_across_surfaces: boolean
 }
@@ -152,6 +154,7 @@ export function SystemsPage() {
     coverage_sqm: null,
     coverage_note: '',
     option_group: '',
+    group_label: '',
     depends_on_product_id: null,
     shared_across_surfaces: false,
   })
@@ -416,6 +419,7 @@ export function SystemsPage() {
       coverage_sqm: 0,
       coverage_note: '',
       option_group: '',
+      group_label: '',
       depends_on_product_id: '',
       shared_across_surfaces: false,
     })
@@ -436,6 +440,7 @@ export function SystemsPage() {
       coverage_sqm: sp.coverage_sqm ?? null,
       coverage_note: sp.coverage_note || '',
       option_group: sp.option_group || '',
+      group_label: sp.group_label || '',
       depends_on_product_id: sp.depends_on_product_id || '',
       shared_across_surfaces: sp.shared_across_surfaces || false,
     })
@@ -515,6 +520,7 @@ export function SystemsPage() {
           coverage_sqm: productForm.coverage_sqm || null,
           coverage_note: productForm.coverage_note.trim() || null,
           option_group: productForm.option_group.trim() || null,
+          group_label: productForm.group_label.trim() || null,
           depends_on_product_id: productForm.depends_on_product_id || null,
           shared_across_surfaces: productForm.shared_across_surfaces,
           display_order: maxOrder + 1,
@@ -552,10 +558,21 @@ export function SystemsPage() {
           coverage_sqm: productForm.coverage_sqm || null,
           coverage_note: productForm.coverage_note.trim() || null,
           option_group: productForm.option_group.trim() || null,
+          group_label: productForm.group_label.trim() || null,
           depends_on_product_id: productForm.depends_on_product_id || null,
           shared_across_surfaces: productForm.shared_across_surfaces,
         })
         .eq('id', editingProduct.id)
+
+      // Keep the section heading consistent across the whole option-group
+      const og = productForm.option_group.trim()
+      if (!error && og) {
+        await supabase
+          .from('system_products')
+          .update({ group_label: productForm.group_label.trim() || null })
+          .eq('system_id', selectedSystem.id)
+          .eq('option_group', og)
+      }
 
       if (error) {
         console.error('Update error:', error)
@@ -1245,6 +1262,19 @@ export function SystemsPage() {
                     )
                   })()}
                   <p className="text-xs text-stone mt-1">Products with the same group become OR choices</p>
+                </div>
+
+                {/* Section heading shown in the calculator */}
+                <div>
+                  <label className="block text-sm font-medium text-ink mb-1">Section heading <span className="text-ash font-normal">(optional)</span></label>
+                  <input
+                    type="text"
+                    value={productForm.group_label}
+                    onChange={e => setProductForm({ ...productForm, group_label: e.target.value })}
+                    placeholder="e.g. Primer  ·  Reinforcement Mesh"
+                    className="w-full px-3 py-2 border border-line rounded-lg"
+                  />
+                  <p className="text-xs text-stone mt-1">The bold heading shown above this layer in the calculator. Blank = use the product/stage name. Applies to the whole group.</p>
                 </div>
 
                 {/* Depends on (conditional visibility) */}

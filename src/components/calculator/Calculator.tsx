@@ -24,6 +24,7 @@ interface SystemProduct {
   product_id: string
   stage_id: string
   option_group: string | null
+  group_label?: string | null
   is_default_option: boolean
   is_optional: boolean
   coverage_sqm: number | null
@@ -801,9 +802,10 @@ export function Calculator() {
         <div className="flex justify-between items-start">
           <div>
             <p className="font-medium text-basalt flex items-center gap-1.5">
-              {hasMultipleProducts 
-                ? stageName 
-                : selectedProduct?.product?.name || layer.products[0]?.product?.name || stageName}
+              {layer.products[0]?.group_label
+                || (hasMultipleProducts
+                  ? stageName
+                  : selectedProduct?.product?.name || layer.products[0]?.product?.name || stageName)}
               {showTooltips && !hasMultipleProducts && selectedProduct?.product?.description && (
                 <InfoTip content={selectedProduct.product.description} />
               )}
@@ -1061,7 +1063,7 @@ export function Calculator() {
                   <div key={layer.key} className={`bg-bone border border-line rounded-xl p-5 ${!st.enabled ? 'opacity-60' : ''}`}>
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="font-medium text-basalt">{selected.product?.name}</p>
+                        <p className="font-medium text-basalt">{reps[0]?.group_label || selected.product?.name}</p>
                         {effNote(selected) && <p className="text-xs text-stone mt-0.5">{effNote(selected)}</p>}
                       </div>
                       <button

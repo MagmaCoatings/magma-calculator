@@ -82,6 +82,7 @@ ALTER TABLE custom_colours ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES a
 ALTER TABLE system_products ADD COLUMN IF NOT EXISTS depends_on_product_ids uuid[];
 ALTER TABLE system_products ADD COLUMN IF NOT EXISTS coverage_sqm_over_mesh numeric;
 ALTER TABLE system_products ADD COLUMN IF NOT EXISTS coverage_sqm_per_pack  numeric; -- legacy, kept for safety
+ALTER TABLE system_products ADD COLUMN IF NOT EXISTS group_label            text;    -- editable section heading in the calculator
 
 -- login_logs columns the app writes/reads (table originally lacked these)
 ALTER TABLE public.login_logs
