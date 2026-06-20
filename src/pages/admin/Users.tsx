@@ -31,6 +31,19 @@ interface Profile {
   last_login: string | null
 }
 
+interface LoginLog {
+  id: string
+  ip_address: string | null
+  city: string | null
+  region: string | null
+  country: string | null
+  device_type: string | null
+  browser: string | null
+  os: string | null
+  success: boolean | null
+  logged_in_at: string
+}
+
 export function UsersPage() {
   const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
@@ -39,6 +52,65 @@ export function UsersPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  // Editable contact details + per-user login history (admin)
+  const [detailForm, setDetailForm] = useState<Partial<Profile>>({})
+  const [savingDetails, setSavingDetails] = useState(false)
+  const [savedDetails, setSavedDetails] = useState(false)
+  const [userLogins, setUserLogins] = useState<LoginLog[]>([])
+  const [loginsLoading, setLoginsLoading] = useState(false)
+
+  async function openDetails(user: Profile) {
+    if (expandedId === user.id) { setExpandedId(null); return }
+    setExpandedId(user.id)
+    setSavedDetails(false)
+    setDetailForm({
+      first_name: user.first_name || '', last_name: user.last_name || '',
+      company_name: user.company_name || '',
+      address_line1: user.address_line1 || '', address_line2: user.address_line2 || '', address_line3: user.address_line3 || '',
+      town_city: user.town_city || '', postcode: user.postcode || '',
+      phone: user.phone || '', mobile: user.mobile || '',
+      website_url: user.website_url || '', instagram_handle: user.instagram_handle || '', facebook_url: user.facebook_url || '',
+    })
+    setUserLogins([])
+    setLoginsLoading(true)
+    const { data } = await supabase
+      .from('login_logs')
+      .select('id, ip_address, city, region, country, device_type, browser, os, success, logged_in_at')
+      .eq('user_id', user.id)
+      .order('logged_in_at', { ascending: false })
+      .limit(25)
+    setUserLogins((data as LoginLog[]) || [])
+    setLoginsLoading(false)
+  }
+
+  async function saveUserDetails(userId: string) {
+    setSavingDetails(true)
+    const fullName = [detailForm.first_name, detailForm.last_name].filter(Boolean).join(' ').trim()
+    const patch: Partial<Profile> = {
+      first_name: detailForm.first_name?.trim() || null,
+      last_name: detailForm.last_name?.trim() || null,
+      company_name: detailForm.company_name?.trim() || null,
+      address_line1: detailForm.address_line1?.trim() || null,
+      address_line2: detailForm.address_line2?.trim() || null,
+      address_line3: detailForm.address_line3?.trim() || null,
+      town_city: detailForm.town_city?.trim() || null,
+      postcode: detailForm.postcode?.trim() || null,
+      phone: detailForm.phone?.trim() || null,
+      mobile: detailForm.mobile?.trim() || null,
+      website_url: detailForm.website_url?.trim() || null,
+      instagram_handle: detailForm.instagram_handle?.trim() || null,
+      facebook_url: detailForm.facebook_url?.trim() || null,
+    }
+    if (fullName) patch.full_name = fullName
+    const { error } = await supabase.from('profiles').update(patch).eq('id', userId)
+    setSavingDetails(false)
+    if (error) { alert('Error saving details: ' + error.message); return }
+    logUpdate('user', userId, detailForm.company_name || 'Unknown', { edited: 'contact details' })
+    setSavedDetails(true)
+    setTimeout(() => setSavedDetails(false), 2500)
+    fetchUsers()
+  }
 
   // Invite-new-user form
   const [showInvite, setShowInvite] = useState(false)
@@ -170,10 +242,6 @@ export function UsersPage() {
       user.facebook_url ? `Facebook: ${user.facebook_url}` : null,
     ].filter(line => line !== null)
     return lines.join('\n')
-  }
-
-  function hasAddress(user: Profile): boolean {
-    return !!(user.address_line1 || user.town_city || user.postcode)
   }
 
   async function copyToClipboard(text: string, fieldId: string) {
@@ -376,17 +444,15 @@ export function UsersPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {hasAddress(user) && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setExpandedId(expandedId === user.id ? null : user.id)}
-                      className="gap-1"
-                    >
-                      {expandedId === user.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      Details
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openDetails(user)}
+                    className="gap-1"
+                  >
+                    {expandedId === user.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    Details
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -405,43 +471,84 @@ export function UsersPage() {
                 </div>
               </div>
 
-              {/* Expanded Details */}
+              {/* Expanded Details: editable contact + login history */}
               {expandedId === user.id && (
-                <div className="mt-4 pt-4 border-t border-line-soft">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Address */}
-                    <div className="bg-limestone rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-medium text-stone uppercase">Address (for labels)</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 gap-1 text-xs"
-                          onClick={() => copyToClipboard(getFormattedAddress(user), `addr-${user.id}`)}
-                        >
+                <div className="mt-4 pt-4 border-t border-line-soft space-y-6">
+                  {/* Editable contact details */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-medium text-stone uppercase tracking-wide">Contact details</span>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs"
+                          onClick={() => copyToClipboard(getFormattedAddress(user), `addr-${user.id}`)}>
                           {copiedField === `addr-${user.id}` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                          {copiedField === `addr-${user.id}` ? 'Copied' : 'Copy'}
+                          {copiedField === `addr-${user.id}` ? 'Copied' : 'Copy address'}
                         </Button>
-                      </div>
-                      <pre className="text-sm text-ink whitespace-pre-wrap font-sans">{getFormattedAddress(user)}</pre>
-                    </div>
-
-                    {/* All Contact Details */}
-                    <div className="bg-limestone rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-medium text-stone uppercase">All Contact Details</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 gap-1 text-xs"
-                          onClick={() => copyToClipboard(getAllContactDetails(user), `all-${user.id}`)}
-                        >
+                        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs"
+                          onClick={() => copyToClipboard(getAllContactDetails(user), `all-${user.id}`)}>
                           {copiedField === `all-${user.id}` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                          {copiedField === `all-${user.id}` ? 'Copied' : 'Copy'}
+                          {copiedField === `all-${user.id}` ? 'Copied' : 'Copy all'}
                         </Button>
                       </div>
-                      <pre className="text-sm text-ink whitespace-pre-wrap font-sans">{getAllContactDetails(user)}</pre>
                     </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {([
+                        ['first_name', 'First name'], ['last_name', 'Last name'],
+                        ['company_name', 'Company'], ['address_line1', 'Address line 1'],
+                        ['address_line2', 'Address line 2'], ['address_line3', 'Address line 3'],
+                        ['town_city', 'Town / City'], ['postcode', 'Postcode'],
+                        ['phone', 'Phone'], ['mobile', 'Mobile'],
+                        ['website_url', 'Website'], ['instagram_handle', 'Instagram'],
+                        ['facebook_url', 'Facebook'],
+                      ] as [keyof Profile, string][]).map(([key, label]) => (
+                        <div key={key}>
+                          <label className="block text-xs text-stone mb-1">{label}</label>
+                          <Input
+                            value={(detailForm[key] as string) || ''}
+                            onChange={e => setDetailForm(f => ({ ...f, [key]: e.target.value }))}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-ash mt-2">Email ({user.email}) is the login and can't be changed here.</p>
+                    <div className="mt-3">
+                      <Button size="sm" onClick={() => saveUserDetails(user.id)} disabled={savingDetails}>
+                        {savingDetails ? 'Saving…' : savedDetails ? 'Saved ✓' : 'Save changes'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Login history */}
+                  <div>
+                    <span className="text-xs font-medium text-stone uppercase tracking-wide">Recent logins</span>
+                    {loginsLoading ? (
+                      <p className="text-sm text-ash mt-2">Loading…</p>
+                    ) : userLogins.length === 0 ? (
+                      <p className="text-sm text-ash mt-2">No logins recorded yet.</p>
+                    ) : (
+                      <div className="mt-2 overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-xs text-stone uppercase text-left border-b border-line">
+                              <th className="py-2 pr-4 font-medium whitespace-nowrap">When</th>
+                              <th className="py-2 pr-4 font-medium">Device</th>
+                              <th className="py-2 pr-4 font-medium">Location</th>
+                              <th className="py-2 font-medium">IP address</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {userLogins.map(l => (
+                              <tr key={l.id} className="border-b border-line-soft">
+                                <td className="py-2 pr-4 text-ink whitespace-nowrap">{formatDate(l.logged_in_at)}</td>
+                                <td className="py-2 pr-4 text-ink">{[l.browser, l.os].filter(Boolean).join(' / ') || l.device_type || '—'}</td>
+                                <td className="py-2 pr-4 text-ink">{[l.city, l.country].filter(Boolean).join(', ') || '—'}</td>
+                                <td className="py-2 text-stone tabular-nums">{l.ip_address || '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
