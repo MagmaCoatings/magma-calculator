@@ -34,17 +34,17 @@ VALUES
   ('str_mesh_180', '180g', 'STR Discs 430mm (mesh)', 10, 1, 'each', 7.20, true, true, 912),
   ('str_mesh_220', '220g', 'STR Discs 430mm (mesh)', 10, 1, 'each', 7.20, true, true, 913),
 
-  -- Vented Diamond Discs 150mm / 6" — priced each, no minimum
-  ('vd150_50',  '50g',  'Vented Diamond Discs 150mm / 6"', NULL, 1, 'each', 20.00, true, true, 920),
-  ('vd150_100', '100g', 'Vented Diamond Discs 150mm / 6"', NULL, 1, 'each', 20.00, true, true, 921),
-  ('vd150_200', '200g', 'Vented Diamond Discs 150mm / 6"', NULL, 1, 'each', 20.00, true, true, 922),
-  ('vd150_220', '220g', 'Vented Diamond Discs 150mm / 6"', NULL, 1, 'each', 20.00, true, true, 923),
+  -- 150mm / 6" Vented Diamond Discs — priced each, no minimum
+  ('vd150_50',  '50g',  '150mm / 6" - Vented Diamond Discs', NULL, 1, 'each', 20.00, true, true, 920),
+  ('vd150_100', '100g', '150mm / 6" - Vented Diamond Discs', NULL, 1, 'each', 20.00, true, true, 921),
+  ('vd150_200', '200g', '150mm / 6" - Vented Diamond Discs', NULL, 1, 'each', 20.00, true, true, 922),
+  ('vd150_220', '220g', '150mm / 6" - Vented Diamond Discs', NULL, 1, 'each', 20.00, true, true, 923),
 
-  -- Vented Diamond Discs 225mm / 9" — priced each, no minimum
-  ('vd225_50',  '50g',  'Vented Diamond Discs 225mm / 9"', NULL, 1, 'each', 38.50, true, true, 930),
-  ('vd225_100', '100g', 'Vented Diamond Discs 225mm / 9"', NULL, 1, 'each', 38.50, true, true, 931),
-  ('vd225_200', '200g', 'Vented Diamond Discs 225mm / 9"', NULL, 1, 'each', 38.50, true, true, 932),
-  ('vd225_220', '220g', 'Vented Diamond Discs 225mm / 9"', NULL, 1, 'each', 38.50, true, true, 933),
+  -- 225mm / 9" Vented Diamond Discs — priced each, no minimum
+  ('vd225_50',  '50g',  '225mm / 9" - Vented Diamond Discs', NULL, 1, 'each', 38.50, true, true, 930),
+  ('vd225_100', '100g', '225mm / 9" - Vented Diamond Discs', NULL, 1, 'each', 38.50, true, true, 931),
+  ('vd225_200', '200g', '225mm / 9" - Vented Diamond Discs', NULL, 1, 'each', 38.50, true, true, 932),
+  ('vd225_220', '220g', '225mm / 9" - Vented Diamond Discs', NULL, 1, 'each', 38.50, true, true, 933),
 
   -- Grinding Discs 175mm / 7" — priced each, no minimum
   ('grind175_yellow', '30/40g — Yellow / General',  'Grinding Discs 175mm / 7"', NULL, 1, 'each', 63.00, true, true, 940),

@@ -209,6 +209,40 @@ export function SystemsPage() {
     }
   }
 
+  // Reorder a whole stage-group up/down among groups in the SAME stage.
+  // Reassigns system_products.display_order across the system in the new order.
+  async function moveGroup(orderedKeys: string[], idx: number, direction: 'up' | 'down') {
+    const swapWith = direction === 'up' ? idx - 1 : idx + 1
+    if (swapWith < 0 || swapWith >= orderedKeys.length) return
+
+    const keys = [...orderedKeys]
+    ;[keys[idx], keys[swapWith]] = [keys[swapWith], keys[idx]]
+
+    // Rebuild a flat product order following the new group order, then number sequentially
+    const groupProducts: { [key: string]: SystemProduct[] } = {}
+    systemProducts.forEach(sp => {
+      const k = sp.option_group || sp.id
+      ;(groupProducts[k] = groupProducts[k] || []).push(sp)
+    })
+
+    const updates: { id: string; display_order: number }[] = []
+    let order = 0
+    for (const k of keys) {
+      for (const sp of groupProducts[k] || []) updates.push({ id: sp.id, display_order: order++ })
+    }
+
+    // Optimistic local update so the UI moves immediately
+    setSystemProducts(prev => prev.map(sp => {
+      const u = updates.find(x => x.id === sp.id)
+      return u ? { ...sp, display_order: u.display_order } : sp
+    }))
+
+    for (const u of updates) {
+      await supabase.from('system_products').update({ display_order: u.display_order }).eq('id', u.id)
+    }
+    if (selectedSystem) await fetchSystemDetails(selectedSystem.id)
+  }
+
   async function createSystem() {
     if (!newSystem.name.trim()) return
     
@@ -686,7 +720,7 @@ export function SystemsPage() {
 
   // Edit system view
   if (view === 'edit' && selectedSystem) {
-    const stageGroups: { [key: string]: { stage: string; stageOrder: number; products: SystemProduct[]; is_optional: boolean } } = {}
+    const stageGroups: { [key: string]: { stage: string; stageOrder: number; products: SystemProduct[]; is_optional: boolean; minOrder: number } } = {}
     systemProducts.forEach(sp => {
       const key = sp.option_group || sp.id
       if (!stageGroups[key]) {
@@ -694,13 +728,17 @@ export function SystemsPage() {
           stage: sp.stage?.name || 'Other',
           stageOrder: sp.stage?.display_order || 99,
           products: [],
-          is_optional: sp.is_optional
+          is_optional: sp.is_optional,
+          minOrder: sp.display_order ?? 0,
         }
       }
       stageGroups[key].products.push(sp)
+      stageGroups[key].minOrder = Math.min(stageGroups[key].minOrder, sp.display_order ?? 0)
     })
 
-    const sortedGroups = Object.entries(stageGroups).sort(([, a], [, b]) => a.stageOrder - b.stageOrder)
+    // Order groups by stage, then by display_order within a stage (matches the calculator)
+    const sortedGroups = Object.entries(stageGroups).sort(([, a], [, b]) => a.stageOrder - b.stageOrder || a.minOrder - b.minOrder)
+    const groupKeys = sortedGroups.map(([k]) => k)
 
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -821,10 +859,25 @@ export function SystemsPage() {
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
-                {sortedGroups.map(([key, group]) => (
+                {sortedGroups.map(([key, group], idx) => {
+                  const canUp = idx > 0 && sortedGroups[idx - 1][1].stage === group.stage
+                  const canDown = idx < sortedGroups.length - 1 && sortedGroups[idx + 1][1].stage === group.stage
+                  return (
                   <div key={key} className="p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
+                        {(canUp || canDown) && (
+                          <div className="flex flex-col -my-1 mr-1">
+                            <button onClick={() => moveGroup(groupKeys, idx, 'up')} disabled={!canUp}
+                              className="p-0.5 text-ash hover:text-ink disabled:opacity-25" title="Move up">
+                              <ChevronUp className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => moveGroup(groupKeys, idx, 'down')} disabled={!canDown}
+                              className="p-0.5 text-ash hover:text-ink disabled:opacity-25" title="Move down">
+                              <ChevronDown className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
                         <span className="font-medium text-ink">{group.stage}</span>
                         {group.is_optional && (
                           <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">optional</span>
@@ -861,7 +914,8 @@ export function SystemsPage() {
                       ))}
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </CardContent>
