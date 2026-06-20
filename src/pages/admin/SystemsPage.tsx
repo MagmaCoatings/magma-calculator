@@ -209,34 +209,46 @@ export function SystemsPage() {
     }
   }
 
-  // Reorder a whole stage-group up/down among groups in the SAME stage.
-  // Reassigns system_products.display_order across the system in the new order.
-  async function moveGroup(orderedKeys: string[], idx: number, direction: 'up' | 'down') {
+  // Reorder a layer-group up/down within a system.
+  //  • Same stage  → reorder the option-groups (this system only).
+  //  • Different stage → swap the two STAGES' order (affects every system — confirmed first).
+  type GroupRef = { key: string; stageId: string | null; stageName: string; stageOrder: number }
+  async function moveGroup(groups: GroupRef[], idx: number, direction: 'up' | 'down') {
     const swapWith = direction === 'up' ? idx - 1 : idx + 1
-    if (swapWith < 0 || swapWith >= orderedKeys.length) return
+    if (swapWith < 0 || swapWith >= groups.length) return
+    const cur = groups[idx]
+    const tgt = groups[swapWith]
 
-    const keys = [...orderedKeys]
+    // Cross-stage move → reorder the stages globally
+    if (cur.stageName !== tgt.stageName) {
+      if (!cur.stageId || !tgt.stageId) return
+      const ok = window.confirm(
+        `"${cur.stageName}" and "${tgt.stageName}" are separate stages, so changing their order changes it for ALL systems. Continue?`
+      )
+      if (!ok) return
+      await supabase.from('stages').update({ display_order: tgt.stageOrder }).eq('id', cur.stageId)
+      await supabase.from('stages').update({ display_order: cur.stageOrder }).eq('id', tgt.stageId)
+      if (selectedSystem) await fetchSystemDetails(selectedSystem.id)
+      return
+    }
+
+    // Same stage → reorder option-groups within this system, renumbering display_order
+    const keys = groups.map(g => g.key)
     ;[keys[idx], keys[swapWith]] = [keys[swapWith], keys[idx]]
-
-    // Rebuild a flat product order following the new group order, then number sequentially
     const groupProducts: { [key: string]: SystemProduct[] } = {}
     systemProducts.forEach(sp => {
       const k = sp.option_group || sp.id
       ;(groupProducts[k] = groupProducts[k] || []).push(sp)
     })
-
     const updates: { id: string; display_order: number }[] = []
     let order = 0
     for (const k of keys) {
       for (const sp of groupProducts[k] || []) updates.push({ id: sp.id, display_order: order++ })
     }
-
-    // Optimistic local update so the UI moves immediately
     setSystemProducts(prev => prev.map(sp => {
       const u = updates.find(x => x.id === sp.id)
       return u ? { ...sp, display_order: u.display_order } : sp
     }))
-
     for (const u of updates) {
       await supabase.from('system_products').update({ display_order: u.display_order }).eq('id', u.id)
     }
@@ -738,7 +750,12 @@ export function SystemsPage() {
 
     // Order groups by stage, then by display_order within a stage (matches the calculator)
     const sortedGroups = Object.entries(stageGroups).sort(([, a], [, b]) => a.stageOrder - b.stageOrder || a.minOrder - b.minOrder)
-    const groupKeys = sortedGroups.map(([k]) => k)
+    const groupOrder: GroupRef[] = sortedGroups.map(([key, g]) => ({
+      key,
+      stageId: (g.products[0]?.stage_id ?? g.products[0]?.stage?.id ?? null) as string | null,
+      stageName: g.stage,
+      stageOrder: g.stageOrder,
+    }))
 
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -846,7 +863,10 @@ export function SystemsPage() {
         <Card>
           <CardHeader className="border-b">
             <div className="flex items-center justify-between">
-              <CardTitle>Other build-up stages</CardTitle>
+              <div>
+                <CardTitle>Other build-up stages</CardTitle>
+                <p className="text-xs text-stone mt-1">Use the ▲▼ buttons on the left of each layer to change its order.</p>
+              </div>
               <Button variant="outline" onClick={openAddProduct}>
                 <Plus className="w-4 h-4 mr-2" /> Add product
               </Button>
@@ -860,24 +880,24 @@ export function SystemsPage() {
             ) : (
               <div className="divide-y divide-gray-100">
                 {sortedGroups.map(([key, group], idx) => {
-                  const canUp = idx > 0 && sortedGroups[idx - 1][1].stage === group.stage
-                  const canDown = idx < sortedGroups.length - 1 && sortedGroups[idx + 1][1].stage === group.stage
+                  const canUp = idx > 0
+                  const canDown = idx < sortedGroups.length - 1
                   return (
                   <div key={key} className="p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        {(canUp || canDown) && (
-                          <div className="flex flex-col -my-1 mr-1">
-                            <button onClick={() => moveGroup(groupKeys, idx, 'up')} disabled={!canUp}
-                              className="p-0.5 text-ash hover:text-ink disabled:opacity-25" title="Move up">
-                              <ChevronUp className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => moveGroup(groupKeys, idx, 'down')} disabled={!canDown}
-                              className="p-0.5 text-ash hover:text-ink disabled:opacity-25" title="Move down">
-                              <ChevronDown className="w-4 h-4" />
-                            </button>
-                          </div>
-                        )}
+                      <div className="flex items-center gap-3">
+                        <div className="flex flex-col gap-1">
+                          <button onClick={() => moveGroup(groupOrder, idx, 'up')} disabled={!canUp}
+                            className="w-7 h-6 flex items-center justify-center rounded-md border border-line text-ink bg-bone hover:bg-molten-tint hover:border-molten disabled:opacity-25 disabled:hover:bg-bone disabled:hover:border-line"
+                            title="Move this layer up">
+                            <ChevronUp className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => moveGroup(groupOrder, idx, 'down')} disabled={!canDown}
+                            className="w-7 h-6 flex items-center justify-center rounded-md border border-line text-ink bg-bone hover:bg-molten-tint hover:border-molten disabled:opacity-25 disabled:hover:bg-bone disabled:hover:border-line"
+                            title="Move this layer down">
+                            <ChevronDown className="w-4 h-4" />
+                          </button>
+                        </div>
                         <span className="font-medium text-ink">{group.stage}</span>
                         {group.is_optional && (
                           <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">optional</span>
