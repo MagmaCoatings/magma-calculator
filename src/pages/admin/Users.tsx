@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { logUpdate } from '@/lib/activityLog'
 import { Card } from '@/components/ui/card'
@@ -47,6 +48,7 @@ interface LoginLog {
 
 export function UsersPage() {
   const { user: currentUser } = useAuth()
+  const navigate = useNavigate()
   const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -61,11 +63,15 @@ export function UsersPage() {
   const [savedDetails, setSavedDetails] = useState(false)
   const [userLogins, setUserLogins] = useState<LoginLog[]>([])
   const [loginsLoading, setLoginsLoading] = useState(false)
+  const [userQuotes, setUserQuotes] = useState<{ id: string; reference: string; project_name: string | null; client_name: string | null; total: number; status: string; created_at: string }[]>([])
+  const [resetPwResult, setResetPwResult] = useState<{ userId: string; password: string } | null>(null)
+  const [resettingPw, setResettingPw] = useState(false)
 
   async function openDetails(user: Profile) {
     if (expandedId === user.id) { setExpandedId(null); return }
     setExpandedId(user.id)
     setSavedDetails(false)
+    setResetPwResult(null)
     setDetailForm({
       first_name: user.first_name || '', last_name: user.last_name || '',
       company_name: user.company_name || '',
@@ -84,6 +90,29 @@ export function UsersPage() {
       .limit(25)
     setUserLogins((data as LoginLog[]) || [])
     setLoginsLoading(false)
+
+    // The installer's saved quotes (admins can read all quotes)
+    setUserQuotes([])
+    const { data: q } = await supabase
+      .from('quotes')
+      .select('id, reference, project_name, client_name, total, status, created_at')
+      .eq('created_by', user.id)
+      .order('created_at', { ascending: false })
+    setUserQuotes((q as typeof userQuotes) || [])
+  }
+
+  async function resetUserPassword(userId: string) {
+    if (!window.confirm('Set a new password for this user?\n\nYou will be given a new password to send them. Their current password will stop working.')) return
+    setResettingPw(true)
+    setResetPwResult(null)
+    const { data, error } = await supabase.functions.invoke('set-password', { body: { user_id: userId } })
+    setResettingPw(false)
+    if (error || (data && data.error)) {
+      alert('Could not reset password: ' + ((data && data.error) || error?.message || 'unknown error'))
+      return
+    }
+    setResetPwResult({ userId, password: data.password })
+    logUpdate('user', userId, 'password reset', { reset: true })
   }
 
   async function saveUserDetails(userId: string) {
@@ -591,6 +620,62 @@ export function UsersPage() {
                                 <td className="py-2 pr-4 text-ink">{[l.browser, l.os].filter(Boolean).join(' / ') || l.device_type || '—'}</td>
                                 <td className="py-2 pr-4 text-ink">{[l.city, l.country].filter(Boolean).join(', ') || '—'}</td>
                                 <td className="py-2 text-stone tabular-nums">{l.ip_address || '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Reset password */}
+                  <div>
+                    <span className="text-xs font-medium text-stone uppercase tracking-wide">Password</span>
+                    <div className="mt-2">
+                      <Button variant="outline" size="sm" onClick={() => resetUserPassword(user.id)} disabled={resettingPw}>
+                        {resettingPw ? 'Setting…' : 'Set a new password'}
+                      </Button>
+                    </div>
+                    {resetPwResult && resetPwResult.userId === user.id && (
+                      <div className="mt-3 bg-bone border border-line rounded-lg p-3">
+                        <p className="text-sm text-ink mb-2">New password set — send them these details:</p>
+                        <p className="font-mono text-xs break-all">Login: https://calculator.magmacoatings.com</p>
+                        <p className="font-mono text-xs break-all">Email: {user.email}</p>
+                        <p className="font-mono text-xs break-all">Password: {resetPwResult.password}</p>
+                        <Button variant="outline" size="sm" className="mt-2 gap-1"
+                          onClick={() => copyToClipboard(`Magma Calculator login:\nhttps://calculator.magmacoatings.com\nEmail: ${user.email}\nPassword: ${resetPwResult.password}\n\nPlease change your password after logging in.`, `pw-${user.id}`)}>
+                          {copiedField === `pw-${user.id}` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                          {copiedField === `pw-${user.id}` ? 'Copied' : 'Copy details to send'}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Saved quotes */}
+                  <div>
+                    <span className="text-xs font-medium text-stone uppercase tracking-wide">Saved quotes ({userQuotes.length})</span>
+                    {userQuotes.length === 0 ? (
+                      <p className="text-sm text-ash mt-2">No quotes yet.</p>
+                    ) : (
+                      <div className="mt-2 overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-xs text-stone uppercase text-left border-b border-line">
+                              <th className="py-2 pr-4 font-medium whitespace-nowrap">Ref</th>
+                              <th className="py-2 pr-4 font-medium">Project / client</th>
+                              <th className="py-2 pr-4 font-medium">Status</th>
+                              <th className="py-2 pr-4 font-medium whitespace-nowrap">Date</th>
+                              <th className="py-2 font-medium text-right">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {userQuotes.map(qt => (
+                              <tr key={qt.id} className="border-b border-line-soft hover:bg-limestone cursor-pointer" onClick={() => navigate(`/quotes/${qt.id}`)}>
+                                <td className="py-2 pr-4 text-molten-ink font-medium whitespace-nowrap">{qt.reference}</td>
+                                <td className="py-2 pr-4 text-ink">{qt.project_name || qt.client_name || '—'}</td>
+                                <td className="py-2 pr-4 text-ink capitalize">{qt.status}</td>
+                                <td className="py-2 pr-4 text-stone whitespace-nowrap">{formatDate(qt.created_at)}</td>
+                                <td className="py-2 text-ink text-right tabular-nums">£{(qt.total ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                               </tr>
                             ))}
                           </tbody>
