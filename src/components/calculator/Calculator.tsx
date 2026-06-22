@@ -1051,7 +1051,7 @@ export function Calculator() {
               {stg.layers.map(layer => {
                 const reps = layer.products
                 if (!depsOk(reps[0])) return null
-                const st = customLayers[layer.key] || { enabled: false, selectedProductId: reps.length === 1 ? reps[0].product_id : null, area: '' as number | '', coats: 1, pigment: false }
+                const st = customLayers[layer.key] || { enabled: false, selectedProductId: reps.length === 1 ? reps[0].product_id : null, area: '' as number | '', coats: 1, pigment: reps[0]?.pigment_default_on ?? false }
                 const multi = reps.length > 1
                 const selected = reps.find(p => p.product_id === st.selectedProductId) || reps[0]
                 const selMin = effMinCoats(selected), selMax = effMaxCoats(selected)
@@ -1067,7 +1067,7 @@ export function Calculator() {
                         {effNote(selected) && <p className="text-xs text-stone mt-0.5">{effNote(selected)}</p>}
                       </div>
                       <button
-                        onClick={() => setCustomLayer(layer.key, { enabled: !st.enabled, selectedProductId: st.selectedProductId || reps[0].product_id, coats: st.enabled ? st.coats : effDefCoats(reps[0]) })}
+                        onClick={() => setCustomLayer(layer.key, { enabled: !st.enabled, selectedProductId: st.selectedProductId || reps[0].product_id, coats: st.enabled ? st.coats : effDefCoats(reps[0]), pigment: st.enabled ? st.pigment : (selected.pigment_default_on ?? false) })}
                         className={`w-12 h-6 rounded-full transition-colors relative shrink-0 ${st.enabled ? 'bg-sage' : 'bg-ash'}`}
                         aria-label={`Toggle ${selected.product?.name}`}
                       >
