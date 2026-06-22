@@ -3,8 +3,9 @@ import { supabase } from '@/lib/supabase'
 import { logUpdate } from '@/lib/activityLog'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Users, Mail, Shield, ShieldOff, ChevronLeft, ChevronRight, Copy, ChevronDown, ChevronUp, Check, UserPlus, X } from 'lucide-react'
+import { Users, Mail, Shield, ShieldOff, ChevronLeft, ChevronRight, Copy, ChevronDown, ChevronUp, Check, UserPlus, X, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { useAuth } from '@/hooks/useAuth'
 
 const ITEMS_PER_PAGE = 20
 
@@ -45,6 +46,7 @@ interface LoginLog {
 }
 
 export function UsersPage() {
+  const { user: currentUser } = useAuth()
   const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -208,9 +210,26 @@ export function UsersPage() {
     } else {
       // Log activity
       logUpdate('user', userId, user?.email || 'Unknown', { status: newStatus })
-      
+
       fetchUsers()
     }
+  }
+
+  async function deleteUser(userId: string, email: string) {
+    if (userId === currentUser?.id) {
+      alert("You can't delete your own account.")
+      return
+    }
+    if (!window.confirm(`Permanently delete ${email}?\n\nThis removes their login and account completely. This cannot be undone. (Useful for re-testing with the same email.)`)) {
+      return
+    }
+    const { data, error } = await supabase.functions.invoke('delete-user', { body: { user_id: userId } })
+    if (error || (data && data.error)) {
+      alert('Could not delete user: ' + ((data && data.error) || error?.message || 'unknown error'))
+      return
+    }
+    logUpdate('user', userId, email, { deleted: true })
+    fetchUsers()
   }
 
   function getFormattedAddress(user: Profile): string {
@@ -486,6 +505,17 @@ export function UsersPage() {
                   >
                     {user.status === 'active' ? 'Suspend' : 'Activate'}
                   </Button>
+                  {user.id !== currentUser?.id && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deleteUser(user.id, user.email)}
+                      title="Permanently delete this user"
+                      className="text-danger hover:bg-danger-tint hover:border-danger"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
 
