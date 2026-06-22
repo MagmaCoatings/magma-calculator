@@ -245,9 +245,27 @@ export function UsersPage() {
   }
 
   async function copyToClipboard(text: string, fieldId: string) {
-    await navigator.clipboard.writeText(text)
-    setCopiedField(fieldId)
-    setTimeout(() => setCopiedField(null), 2000)
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        // Fallback for non-HTTPS / older browsers where navigator.clipboard is unavailable
+        const ta = document.createElement('textarea')
+        ta.value = text
+        ta.style.position = 'fixed'
+        ta.style.left = '-9999px'
+        ta.setAttribute('readonly', '')
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+      }
+      setCopiedField(fieldId)
+      setTimeout(() => setCopiedField(null), 2000)
+    } catch (e) {
+      console.error('Copy failed', e)
+      alert('Could not copy automatically — please select the text and copy it manually.')
+    }
   }
 
   const filteredUsers = users.filter(u => {
