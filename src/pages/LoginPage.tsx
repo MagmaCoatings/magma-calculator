@@ -38,10 +38,27 @@ export function LoginPage() {
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
+    // Race the request against a timeout so the button never hangs on "Sending..."
+    // forever if the email service is slow/unavailable.
+    const result = await Promise.race([
+      supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      }),
+      new Promise<{ error: { message: string } }>(resolve =>
+        setTimeout(
+          () =>
+            resolve({
+              error: {
+                message:
+                  "We couldn't send the reset email just now. Please try again in a moment, or ask your administrator to reset your password for you.",
+              },
+            }),
+          20000
+        )
+      ),
+    ])
 
+    const error = (result as { error: { message: string } | null }).error
     if (error) {
       setError(error.message)
     } else {

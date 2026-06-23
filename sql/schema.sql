@@ -373,6 +373,11 @@ CREATE POLICY "Authenticated users can read colours" ON colours FOR SELECT USING
 CREATE POLICY "Admins can modify colours"            ON colours FOR ALL    USING (is_admin());
 
 -- quotes + quote_items
+-- IMPORTANT: RLS must be ENABLED on these tables, otherwise the policies
+-- below are defined but ignored, leaving every quote readable by any
+-- authenticated user. (This was the cause of a cross-installer data leak.)
+ALTER TABLE public.quotes      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quote_items ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own quotes"   ON public.quotes;
 DROP POLICY IF EXISTS "Users can create own quotes" ON public.quotes;
 DROP POLICY IF EXISTS "Users can update own quotes" ON public.quotes;

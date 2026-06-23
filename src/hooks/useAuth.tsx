@@ -166,10 +166,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
+    // Race against a timeout so callers never await forever if email is slow/down.
+    const result = await Promise.race([
+      supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      }),
+      new Promise<{ error: { message: string } }>(resolve =>
+        setTimeout(
+          () =>
+            resolve({
+              error: {
+                message:
+                  "We couldn't send the reset email just now. Please try again in a moment.",
+              },
+            }),
+          20000
+        )
+      ),
+    ])
 
+    const error = (result as { error: { message: string } | null }).error
     if (error) {
       return { error: error.message }
     }

@@ -10,6 +10,11 @@ import { useAuth } from '@/hooks/useAuth'
 
 const ITEMS_PER_PAGE = 20
 
+// Public URL the app is served from. Invite/reset links and shared login
+// details must always point here — never at a dev origin (localhost), which
+// would otherwise leak into invite emails when an admin tests locally.
+const APP_URL = import.meta.env.VITE_APP_URL || 'https://calculator.magmacoatings.com'
+
 interface Profile {
   id: string
   email: string
@@ -154,7 +159,7 @@ export function UsersPage() {
     setInviting(true)
     setInviteResult(null)
     const { data, error } = await supabase.functions.invoke('create-user', {
-      body: { ...newUser, redirect_to: `${window.location.origin}/reset-password` },
+      body: { ...newUser, redirect_to: `${APP_URL}/reset-password` },
     })
     setInviting(false)
     if (error || (data && data.error)) {
@@ -425,13 +430,13 @@ export function UsersPage() {
               <p>{inviteResult.msg}</p>
               {inviteResult.credentials && (
                 <div className="mt-2 bg-bone border border-line rounded-lg p-3 text-ink">
-                  <p className="font-mono text-xs break-all">Login: {window.location.origin}</p>
+                  <p className="font-mono text-xs break-all">Login: {APP_URL}</p>
                   <p className="font-mono text-xs break-all">Email: {inviteResult.credentials.email}</p>
                   <p className="font-mono text-xs break-all">Password: {inviteResult.credentials.password}</p>
                   <Button
                     variant="outline" size="sm" className="mt-2 gap-1"
                     onClick={() => copyToClipboard(
-                      `Magma Calculator login:\n${window.location.origin}\nEmail: ${inviteResult.credentials!.email}\nPassword: ${inviteResult.credentials!.password}\n\nPlease change your password after logging in.`,
+                      `Magma Calculator login:\n${APP_URL}\nEmail: ${inviteResult.credentials!.email}\nPassword: ${inviteResult.credentials!.password}\n\nPlease change your password after logging in.`,
                       'creds'
                     )}
                   >
