@@ -51,14 +51,15 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading } = useAuth()
-  
-  if (loading) {
+  const { user, profile, loading, profileLoading } = useAuth()
+
+  // Admin gating needs the profile (role), so wait for it before deciding.
+  if (loading || profileLoading) {
     return (
       <Spinner fullScreen />
     )
   }
-  
+
   if (!user) {
     return <Navigate to="/login" replace />
   }

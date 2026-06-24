@@ -8,6 +8,7 @@ interface AuthContextType {
   profile: Profile | null
   session: Session | null
   loading: boolean
+  profileLoading: boolean
   authError: string | null
   signIn: (email: string, password: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
@@ -29,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [profileLoading, setProfileLoading] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
 
   async function fetchProfile(userId: string) {
@@ -101,16 +103,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }, 10000)
 
-    // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    // Get initial session. Render as soon as we know the session — don't block
+    // the whole app on the profile fetch (that network call on a cold first
+    // load is what made the app sit on a spinner until a manual refresh).
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
-      if (session?.user) {
-        const profile = await fetchProfile(session.user.id)
-        setProfile(profile)
-      }
       setLoading(false)
       clearTimeout(timeout)
+      if (session?.user) {
+        setProfileLoading(true)
+        fetchProfile(session.user.id).then(p => {
+          setProfile(p)
+          setProfileLoading(false)
+        })
+      } else {
+        setProfile(null)
+      }
     }).catch(err => {
       console.error('Auth error:', err)
       setLoading(false)
@@ -122,18 +131,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      (_event, session) => {
         setSession(session)
         setUser(session?.user ?? null)
+        setLoading(false)
 
         if (session?.user) {
-          const profile = await fetchProfile(session.user.id)
-          setProfile(profile)
+          setProfileLoading(true)
+          fetchProfile(session.user.id).then(p => {
+            setProfile(p)
+            setProfileLoading(false)
+          })
         } else {
           setProfile(null)
+          setProfileLoading(false)
         }
-
-        setLoading(false)
       }
     )
 
@@ -208,6 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profile,
         session,
         loading,
+        profileLoading,
         authError,
         signIn,
         signOut,
