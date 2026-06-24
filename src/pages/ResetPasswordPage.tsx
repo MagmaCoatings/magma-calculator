@@ -86,7 +86,7 @@ export default function ResetPasswordPage() {
   if (sessionValid === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-limestone">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+        <div className="h-8 w-8 rounded-full border-4 border-molten border-t-transparent animate-spin"></div>
       </div>
     )
   }
@@ -123,7 +123,7 @@ export default function ResetPasswordPage() {
           <p className="text-ink mb-6">
             Your password has been successfully reset. Redirecting to login...
           </p>
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-600 mx-auto"></div>
+          <div className="h-6 w-6 rounded-full border-2 border-molten border-t-transparent animate-spin mx-auto"></div>
         </div>
       </div>
     )

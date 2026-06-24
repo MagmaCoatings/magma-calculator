@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
@@ -133,9 +134,7 @@ export function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-12">
-        <div className="w-8 h-8 border-4 border-molten border-t-transparent rounded-full animate-spin" />
-      </div>
+      <Spinner />
     )
   }
 

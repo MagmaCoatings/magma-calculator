@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { logCreate, logUpdate } from '@/lib/activityLog'
@@ -741,9 +742,7 @@ export function SystemsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-12">
-        <div className="w-8 h-8 border-4 border-molten border-t-transparent rounded-full animate-spin" />
-      </div>
+      <Spinner />
     )
   }
 

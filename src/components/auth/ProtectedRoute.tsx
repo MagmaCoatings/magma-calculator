@@ -13,7 +13,7 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
     return (
       <div className="min-h-screen flex items-center justify-center bg-limestone">
         <div className="text-center">
-          <div className="w-8 h-8 border-4 border-magma border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-8 h-8 border-4 border-molten border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-stone">Loading...</p>
         </div>
       </div>

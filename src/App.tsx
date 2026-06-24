@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/hooks/useAuth'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -23,9 +24,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-magma border-t-transparent rounded-full animate-spin" />
-      </div>
+      <Spinner fullScreen />
     )
   }
   
@@ -56,9 +55,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-magma border-t-transparent rounded-full animate-spin" />
-      </div>
+      <Spinner fullScreen />
     )
   }
   

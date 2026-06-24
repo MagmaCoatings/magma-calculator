@@ -3,7 +3,8 @@ import { supabase } from '@/lib/supabase'
 import { logUpdate } from '@/lib/activityLog'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Save, RefreshCw } from 'lucide-react'
+import { Save } from 'lucide-react'
+import { Spinner } from '@/components/ui/spinner'
 
 interface Setting {
   id: string
@@ -101,9 +102,7 @@ export function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-6 h-6 animate-spin text-ash" />
-      </div>
+      <Spinner />
     )
   }
 
