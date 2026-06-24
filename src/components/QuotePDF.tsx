@@ -272,7 +272,7 @@ export function QuotePDF({
         </View>
 
         {/* Quote Info */}
-        <Text style={styles.title}>Quote</Text>
+        <Text style={styles.title}>Materials Estimate</Text>
         <Text style={styles.reference}>{reference}</Text>
         <Text style={styles.date}>{formatDate(createdAt)}</Text>
 
@@ -375,7 +375,7 @@ export function QuotePDF({
 
         {/* Footer */}
         <Text style={styles.footer}>
-          Magma Coatings Ltd • Quote valid for 30 days
+          Magma Coatings Ltd • Materials estimate valid for 30 days
         </Text>
       </Page>
     </Document>

@@ -182,7 +182,7 @@ export function QuotesPage() {
             ))}
           </select>
         )}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {(['all', 'draft', 'sent', 'accepted', 'declined'] as const).map(status => (
             <button
               key={status}
@@ -241,16 +241,16 @@ export function QuotesPage() {
                         <span className="text-ash italic">No client details</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-4 text-xs text-ash mt-2">
-                      <span>{quote.surface_type}</span>
-                      <span>•</span>
-                      <span>
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-ash mt-2">
+                      <span className="capitalize">{quote.surface_type}</span>
+                      <span aria-hidden="true">•</span>
+                      <span className="whitespace-nowrap">
                         {quote.floor_area > 0 && `${quote.floor_area}m² floor`}
                         {quote.floor_area > 0 && quote.wall_area > 0 && ' + '}
                         {quote.wall_area > 0 && `${quote.wall_area}m² wall`}
                       </span>
-                      <span>•</span>
-                      <span>{formatDate(quote.created_at)}</span>
+                      <span aria-hidden="true">•</span>
+                      <span className="whitespace-nowrap">{formatDate(quote.created_at)}</span>
                       {profile?.role === 'admin' && quote.creator_name && (
                         <>
                           <span>•</span>

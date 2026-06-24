@@ -140,6 +140,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Tell the index.html watchdog the app rendered past the loading spinner.
+  // (If this never fires, the watchdog self-heals a stale/broken cache.)
+  useEffect(() => {
+    if (!loading) {
+      ;(window as Window & { __magmaReady?: boolean }).__magmaReady = true
+    }
+  }, [loading])
+
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,

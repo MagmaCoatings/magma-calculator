@@ -19,6 +19,46 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // PWA resilience — prevents the installed (home-screen) app from getting
+      // permanently stuck on a stale/broken cached bundle (iOS has no refresh button).
+      (function () {
+        if ('serviceWorker' in navigator) {
+          // If a new service worker takes over (fresh deploy), reload once so the
+          // app immediately runs the new code instead of a stale cached version.
+          var hadController = !!navigator.serviceWorker.controller;
+          var reloaded = false;
+          navigator.serviceWorker.addEventListener('controllerchange', function () {
+            if (!hadController || reloaded) return;
+            reloaded = true;
+            window.location.reload();
+          });
+        }
+        // Watchdog: the app sets window.__magmaReady once it has rendered past the
+        // loading spinner. If that hasn't happened within 15s, the cached worker or
+        // bundle is almost certainly stale/broken — clear it all and reload once.
+        setTimeout(function () {
+          if (window.__magmaReady) return;
+          try {
+            if (sessionStorage.getItem('magma_healed')) return;
+            sessionStorage.setItem('magma_healed', '1');
+          } catch (e) {}
+          var done = function () { window.location.reload(); };
+          var clearCaches = function () {
+            if (window.caches && caches.keys) {
+              caches.keys().then(function (ks) {
+                Promise.all(ks.map(function (k) { return caches.delete(k); })).then(done, done);
+              }, done);
+            } else { done(); }
+          };
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (rs) {
+              Promise.all(rs.map(function (r) { return r.unregister(); })).then(clearCaches, clearCaches);
+            }, clearCaches);
+          } else { clearCaches(); }
+        }, 15000);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

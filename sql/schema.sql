@@ -396,10 +396,28 @@ CREATE POLICY "Users can view own quote items" ON public.quote_items FOR SELECT
 CREATE POLICY "Users can manage own quote items" ON public.quote_items FOR ALL
   USING (EXISTS (SELECT 1 FROM public.quotes q WHERE q.id = quote_id AND q.created_by = auth.uid()));
 
+-- products: authenticated read, admin write (holds products, consumables, prices)
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "read products"  ON public.products;
+DROP POLICY IF EXISTS "admin products" ON public.products;
+CREATE POLICY "read products"  ON public.products FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "admin products" ON public.products FOR ALL    USING (is_admin());
+
+-- product_price_history: admins read; inserts happen via SECURITY DEFINER trigger
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables
+             WHERE table_schema='public' AND table_name='product_price_history') THEN
+    EXECUTE 'ALTER TABLE public.product_price_history ENABLE ROW LEVEL SECURITY';
+    EXECUTE 'DROP POLICY IF EXISTS "admin read price history" ON public.product_price_history';
+    EXECUTE 'CREATE POLICY "admin read price history" ON public.product_price_history FOR SELECT USING (is_admin())';
+  END IF;
+END $$;
+
 -- systems config tables: authenticated read, admin write
 DO $$ DECLARE t text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['systems','system_products','stages','finish_presets','finish_preset_products'] LOOP
+  FOREACH t IN ARRAY ARRAY['systems','system_products','stages','finish_presets','finish_preset_products','colour_families','colour_swatches','product_categories'] LOOP
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=t) THEN
       EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', t);
       EXECUTE format('DROP POLICY IF EXISTS "read %1$s"  ON public.%1$I;', t);
