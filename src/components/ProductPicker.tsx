@@ -26,6 +26,8 @@ interface Props {
 }
 
 const fmt = (n: number) => n.toFixed(2)
+// A pack size of 1 reads better as just the unit ("each") than "1each".
+const packLabel = (size: number, unit: string) => (size === 1 ? unit : `${size}${unit}`)
 
 export function ProductPicker({ products, value, onChange, placeholder = 'Search or select a product…' }: Props) {
   const [open, setOpen] = useState(false)
@@ -79,7 +81,7 @@ export function ProductPicker({ products, value, onChange, placeholder = 'Search
   }
 
   const displayText = selected
-    ? `${selected.name} — £${fmt(selected.price)} / ${selected.pack_size}${selected.pack_unit}`
+    ? `${selected.name} — £${fmt(selected.price)} / ${packLabel(selected.pack_size, selected.pack_unit)}`
     : ''
 
   return (
@@ -120,7 +122,7 @@ export function ProductPicker({ products, value, onChange, placeholder = 'Search
                         idx === activeIdx ? 'bg-molten-tint text-molten-ink' : 'text-ink hover:bg-limestone'
                       }`}
                     >
-                      {p.name} <span className="text-ash">— £{fmt(p.price)} / {p.pack_size}{p.pack_unit}</span>
+                      {p.name} <span className="text-ash">— £{fmt(p.price)} / {packLabel(p.pack_size, p.pack_unit)}</span>
                     </button>
                   )
                 })}
