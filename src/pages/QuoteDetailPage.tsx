@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/formatters'
 import { ArrowLeft, Pencil, Save, Copy, Trash2, FileText, Send, CheckCircle, XCircle, Plus, Download, Mail, History, Clock } from 'lucide-react'
 import { QuotePDF } from '@/components/QuotePDF'
+import { ProductPicker } from '@/components/ProductPicker'
 import { MagmaSpinner } from '@/components/brand/MagmaMark'
 import { 
   logQuoteStatusChange, 
@@ -53,6 +54,10 @@ interface Product {
   price: number
   pack_size: number
   pack_unit: string
+  category: string | null
+  display_order: number | null
+  is_consumable: boolean | null
+  consumable_group: string | null
 }
 
 interface HistoryEntry {
@@ -306,10 +311,11 @@ export function QuoteDetailPage() {
   async function fetchProducts() {
     const { data } = await supabase
       .from('products')
-      .select('id, name, code, price, pack_size, pack_unit')
+      .select('id, name, code, price, pack_size, pack_unit, category, display_order, is_consumable, consumable_group')
       .eq('is_active', true)
+      .order('display_order')
       .order('name')
-    
+
     setProducts(data || [])
   }
 
@@ -767,18 +773,11 @@ ${signature}`
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
                   <label className="block text-sm text-ink mb-1">Product</label>
-                  <select
+                  <ProductPicker
+                    products={products}
                     value={selectedProductId}
-                    onChange={e => setSelectedProductId(e.target.value)}
-                    className="w-full px-3 py-2 border border-line rounded-lg bg-bone"
-                  >
-                    <option value="">Select a product...</option>
-                    {products.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} — £{formatCurrency(p.price)} / {p.pack_size}{p.pack_unit}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setSelectedProductId}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm text-ink mb-1">Quantity</label>
