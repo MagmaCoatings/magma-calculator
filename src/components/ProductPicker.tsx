@@ -99,7 +99,7 @@ export function ProductPicker({ products, value, onChange, placeholder = 'Search
         }}
       />
       {open && (
-        <div className="absolute z-20 mt-1 w-full max-h-72 overflow-auto bg-bone border border-line rounded-lg shadow-lg">
+        <div className="absolute z-30 mt-1 w-full max-h-72 overflow-auto bg-bone border border-line rounded-lg shadow-lg">
           {flat.length === 0 ? (
             <div className="px-3 py-3 text-sm text-stone">No matches for “{query}”</div>
           ) : (

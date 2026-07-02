@@ -311,12 +311,19 @@ export function QuoteDetailPage() {
   async function fetchProducts() {
     const { data } = await supabase
       .from('products')
-      .select('id, name, code, price, pack_size, pack_unit, category, display_order, is_consumable, consumable_group')
+      .select('id, name, code, price, pack_size, pack_unit, display_order, is_consumable, consumable_group, category:product_categories(name)')
       .eq('is_active', true)
       .order('display_order')
       .order('name')
 
-    setProducts(data || [])
+    // `category` comes back as a joined object ({ name }); flatten it to a plain
+    // string so the picker can group by it. (Selecting it as a bare column errored
+    // and returned no products — which made the search box look broken.)
+    const rows = (data || []).map((p: Record<string, unknown>) => ({
+      ...p,
+      category: (p.category as { name?: string } | null)?.name ?? null,
+    }))
+    setProducts(rows as unknown as Product[])
   }
 
   function openAddProduct() {
@@ -768,7 +775,7 @@ ${signature}`
           
           {/* Add product form */}
           {showAddProduct && (
-            <div className="mx-4 mt-4 p-4 bg-limestone rounded-lg border border-line">
+            <div className="mx-4 mt-4 mb-5 p-4 bg-limestone rounded-lg border border-line">
               <h4 className="font-medium text-basalt mb-3">Add Product</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
