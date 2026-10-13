@@ -44,7 +44,7 @@ export function IosInstallSteps() {
       </li>
       <li className="flex items-start gap-2">
         <span className="w-5 h-5 rounded-full bg-limestone text-xs font-semibold flex items-center justify-center shrink-0 mt-px">3</span>
-        <span>Open Magma from your home screen and turn alerts on</span>
+        <span>Open Magma from your home screen, log in once more, then tap Turn on alerts</span>
       </li>
     </ol>
   )
