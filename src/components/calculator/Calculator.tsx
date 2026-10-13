@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useColours } from '@/hooks/useProducts'
 import { useSettings } from '@/hooks/useSettings'
@@ -73,6 +73,24 @@ const effMinCoats = (sp: SystemProduct) => sp.min_coats ?? sp.product?.min_coats
 const effMaxCoats = (sp: SystemProduct) => sp.max_coats ?? sp.product?.max_coats ?? effDefCoats(sp)
 const effNote = (sp: SystemProduct) => sp.coverage_note ?? sp.product?.coverage_note ?? null
 
+// Within a stage, list each dependent layer (e.g. tape needing Liquid Membrane) straight after its parent
+function orderWithDependants<T extends { products: SystemProduct[] }>(layers: T[]): T[] {
+  const depIds = (l: T) => {
+    const sp = l.products[0]
+    return [...(sp?.depends_on_product_id ? [sp.depends_on_product_id] : []), ...(sp?.depends_on_product_ids || [])]
+  }
+  const isDependant = (l: T) => depIds(l).length > 0
+  const out: T[] = []
+  layers.filter(l => !isDependant(l)).forEach(parent => {
+    out.push(parent)
+    layers.filter(l => isDependant(l) && depIds(l).some(id => parent.products.some(p => p.id === id))).forEach(d => {
+      if (!out.includes(d)) out.push(d)
+    })
+  })
+  layers.forEach(l => { if (!out.includes(l)) out.push(l) })
+  return out
+}
+
 interface LayerState {
   enabled: boolean
   selectedProductId: string | null
@@ -126,6 +144,11 @@ export function Calculator() {
   const [consumables, setConsumables] = useState<{ id: string; name: string; code: string; price: number; pack_size: number; pack_unit: string; consumable_group: string | null; consumable_min_order: number | null }[]>([])
   const [consumableQtys, setConsumableQtys] = useState<{ [id: string]: number }>({})
   const [showConsumables, setShowConsumables] = useState(false)
+
+  // Layout: folding stage sections, system picker sheet, Floor/Wall switch in Floor + Wall mode
+  const [openStages, setOpenStages] = useState<{ [key: string]: boolean }>({})
+  const [showSystemPicker, setShowSystemPicker] = useState(false)
+  const [editSurface, setEditSurface] = useState<'floor' | 'wall'>('floor')
 
   // Layer states - keyed by stage name or option_group (prefixed with floor_/wall_ in both mode)
   const [layerStates, setLayerStates] = useState<{ [key: string]: LayerState }>({})
@@ -461,6 +484,8 @@ export function Calculator() {
       layer.products.push(sp)
     })
     
+    Object.values(stages).forEach(st => { st.layers = orderWithDependants(st.layers) })
+
     // Sort stages by display_order
     return Object.entries(stages)
       .sort(([, a], [, b]) => a.stageOrder - b.stageOrder)
@@ -798,9 +823,9 @@ export function Calculator() {
         : null
 
     return (
-      <div key={`${stageName}__${layer.key}`} className={`bg-bone border border-line rounded-xl p-5 ${
-        layer.isOptional && !state.enabled ? 'opacity-60' : ''
-      }`}>
+      <div key={`${stageName}__${layer.key}`} className={`py-4 border-t border-line-soft first:border-t-0 ${
+        dependsOnId ? 'ml-2 pl-4 border-l-2 border-l-track' : ''
+      } ${layer.isOptional && !state.enabled ? 'opacity-60' : ''}`}>
         {/* Layer header */}
         <div className="flex justify-between items-start">
           <div>
@@ -820,7 +845,9 @@ export function Calculator() {
           {layer.isOptional && (
             <button
               onClick={() => toggleLayer(layer.key)}
-              className={`w-12 h-6 rounded-full transition-colors relative ${
+              aria-label={`Include ${selectedProduct?.product?.name || stageName}`}
+              aria-pressed={!!state.enabled}
+              className={`w-12 h-6 shrink-0 rounded-full transition-colors relative ${
                 state.enabled ? 'bg-sage' : 'bg-ash'
               }`}
             >
@@ -918,16 +945,48 @@ export function Calculator() {
     )
   }
 
-  // Render stage groups - returns flat array of layer cards
-  function renderStageGroups(groups: [string, { layers: any[] }][]) {
-    const result: React.ReactNode[] = []
-    groups.forEach(([stageName, { layers }]) => {
-      layers.forEach(layer => {
-        const card = renderLayerCard(layer, stageName)
-        if (card) result.push(card)
-      })
+  // One-line summary of what a stage currently includes
+  function stageSummary(layers: { key: string; products: SystemProduct[]; isOptional: boolean }[]) {
+    const names: string[] = []
+    layers.forEach(layer => {
+      const st = layerStates[layer.key]
+      if (!st?.enabled || !st.selectedProductId) return
+      const sp = layer.products.find(p => p.product_id === st.selectedProductId)
+      if (sp?.product?.name) names.push(sp.product.name)
     })
-    return result
+    return names.length ? names.join(' + ') : 'Not included'
+  }
+
+  // Stages as folding sections: header shows the stage and a summary, tap to open its layers
+  function renderStageSections(groups: [string, { layers: any[] }][], prefix: string) {
+    let n = 0
+    return groups.map(([stageName, { layers }]) => {
+      const cards = layers.map(layer => renderLayerCard(layer, stageName)).filter(Boolean)
+      if (cards.length === 0) return null
+      n += 1
+      const openKey = `${prefix}${stageName}`
+      const open = !!openStages[openKey]
+      return (
+        <div key={openKey} className="bg-bone border border-line rounded-xl overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setOpenStages(prev => ({ ...prev, [openKey]: !open }))}
+            aria-expanded={open}
+            className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left min-h-[60px]"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className={`w-6 h-6 rounded-md text-xs font-medium flex items-center justify-center shrink-0 ${open ? 'bg-basalt text-bone' : 'bg-track text-ink'}`}>{n}</span>
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-basalt">{stageName}</span>
+                <span className="block text-xs text-stone truncate">{stageSummary(layers)}</span>
+              </span>
+            </span>
+            <ChevronDown className={`w-5 h-5 text-stone shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+          </button>
+          {open && <div className="px-5 pb-1 border-t border-line-soft">{cards}</div>}
+        </div>
+      )
+    })
   }
 
   // Copy list
@@ -1046,6 +1105,7 @@ export function Calculator() {
       layer.products.push(sp)
     })
     stageList.sort((a, b) => a.order - b.order)
+    stageList.forEach(stg => { stg.layers = orderWithDependants(stg.layers) })
 
     return (
       <>
@@ -1076,10 +1136,32 @@ export function Calculator() {
           </div>
         </div>
 
-        {stageList.map(stg => (
-          <div key={stg.name}>
-            <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3 px-1">{stg.name}</p>
-            <div className="space-y-4">
+        {stageList.map((stg, stgIdx) => {
+          const openKey = `custom_${stg.name}`
+          const open = !!openStages[openKey]
+          const included = stg.layers
+            .filter(l => customLayers[l.key]?.enabled && depsOk(l.products[0]))
+            .map(l => (l.products.find(p => p.product_id === customLayers[l.key]?.selectedProductId) || l.products[0])?.product?.name)
+            .filter(Boolean)
+          return (
+          <div key={stg.name} className="bg-bone border border-line rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setOpenStages(prev => ({ ...prev, [openKey]: !open }))}
+              aria-expanded={open}
+              className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left min-h-[60px]"
+            >
+              <span className="flex items-center gap-3 min-w-0">
+                <span className={`w-6 h-6 rounded-md text-xs font-medium flex items-center justify-center shrink-0 ${open ? 'bg-basalt text-bone' : 'bg-track text-ink'}`}>{stgIdx + 1}</span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-basalt">{stg.name}</span>
+                  <span className="block text-xs text-stone truncate">{included.length ? included.join(' + ') : 'None selected'}</span>
+                </span>
+              </span>
+              <ChevronDown className={`w-5 h-5 text-stone shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+            {open && (
+            <div className="px-5 pb-1 border-t border-line-soft">
               {stg.layers.map(layer => {
                 const reps = layer.products
                 if (!depsOk(reps[0])) return null
@@ -1092,7 +1174,7 @@ export function Calculator() {
                 const isDual = selOverMesh != null && selOverMesh !== selStd
                 const effApp: 'mesh' | 'standard' = st.application ?? (meshOn ? 'mesh' : 'standard')
                 return (
-                  <div key={layer.key} className={`bg-bone border border-line rounded-xl p-5 ${!st.enabled ? 'opacity-60' : ''}`}>
+                  <div key={layer.key} className={`py-4 border-t border-line-soft first:border-t-0 ${reps[0].depends_on_product_id || reps[0].depends_on_product_ids?.length ? 'ml-2 pl-4 border-l-2 border-l-track' : ''} ${!st.enabled ? 'opacity-60' : ''}`}>
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="font-medium text-basalt">{reps[0]?.group_label || selected.product?.name}</p>
@@ -1196,21 +1278,36 @@ export function Calculator() {
                 )
               })}
             </div>
+            )}
           </div>
-        ))}
+          )
+        })}
       </>
     )
   }
 
-  // Filter systems by surface type and family
-  const availableSystems = systems.filter(s => {
-    // First filter by family
-    if (selectedFamily && s.family !== selectedFamily) return false
-    // Then filter by surface type
-    if (surface === 'floor') return s.surface_type === 'floor' || s.name.toLowerCase().includes('floor')
-    if (surface === 'wall') return s.surface_type === 'wall' || s.name.toLowerCase().includes('wall')
-    return true
-  })
+  // System summary line and picker contents
+  const shortName = (id: string | null) => (systems.find(x => x.id === id)?.name || '').replace(/^(Floor|Wall)\s+/i, '')
+  const systemSummary = surface === 'both'
+    ? `Floor ${shortName(floorSystemId) || '-'} · Wall ${shortName(wallSystemId) || '-'}`
+    : (selectedSystem?.name || 'Choose a system')
+  const pickerSurface: 'floor' | 'wall' = surface === 'both' ? editSurface : (surface === 'wall' ? 'wall' : 'floor')
+  const pickerSystems = systems.filter(s => s.surface_type === pickerSurface && (!selectedFamily || s.family === selectedFamily))
+  const pickerSelectedId = surface === 'both'
+    ? (pickerSurface === 'floor' ? floorSystemId : wallSystemId)
+    : selectedSystemId
+  function pickSystem(id: string) {
+    if (surface === 'both') {
+      if (pickerSurface === 'floor') handleFloorSystemChange(id)
+      else handleWallSystemChange(id)
+      return // stay open so the other surface can be chosen too
+    }
+    if (surface === 'floor') setFloorSystemId(id)
+    else if (surface === 'wall') setWallSystemId(id)
+    handleSystemChange(id)
+    setShowSystemPicker(false)
+  }
+
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 pb-52 lg:pb-6">
@@ -1305,95 +1402,47 @@ export function Calculator() {
           </div>
           )}
 
-          {/* Build type / System — Build Your Own replaces it entirely */}
-          {surface === 'custom' ? renderBuildYourOwn() : surface === 'both' ? (
+          {/* System summary (opens the picker) and layers by stage; Build Your Own replaces both */}
+          {surface === 'custom' ? renderBuildYourOwn() : (
             <>
-              {/* Floor configuration */}
-              <div className="bg-bone border border-line rounded-xl p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded bg-basalt text-white text-xs font-medium flex items-center justify-center">F</div>
-                  <p className="text-sm font-medium text-ink">Floor configuration</p>
-                </div>
-                <p className="text-xs font-medium text-stone uppercase tracking-wide mb-2">Build type</p>
-                <div className="bg-track rounded-lg p-1 flex gap-1 mb-4">
-                  {systems.filter(s => s.surface_type === 'floor' && (!selectedFamily || s.family === selectedFamily)).map(system => (
-                    <button
-                      key={system.id}
-                      onClick={() => handleFloorSystemChange(system.id)}
-                      className={`flex-1 py-2 px-3 rounded-md font-medium text-sm transition-all min-h-[44px] ${
-                        floorSystemId === system.id
-                          ? 'bg-bone text-basalt shadow-sm'
-                          : 'text-stone hover:text-ink'
-                      }`}
-                    >
-                      {system.name.replace('Floor ', '')}
-                    </button>
-                  ))}
-                </div>
-                <div className="space-y-3">
-                  {renderStageGroups(floorStageGroups as [string, { layers: any[] }][])}
-                </div>
+              <div className="bg-bone border border-line rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setShowSystemPicker(true)}
+                  className="w-full flex items-center justify-between gap-3 p-5 text-left min-h-[64px]"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-xs font-medium text-stone uppercase tracking-wide">System</span>
+                    <span className="block font-medium text-basalt mt-1">{systemSummary}</span>
+                  </span>
+                  <span className="text-sm font-medium text-molten-ink shrink-0">Change</span>
+                </button>
               </div>
 
-              {/* Wall configuration */}
-              <div className="bg-bone border border-line rounded-xl p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded bg-basalt text-white text-xs font-medium flex items-center justify-center">W</div>
-                  <p className="text-sm font-medium text-ink">Wall configuration</p>
-                </div>
-                <p className="text-xs font-medium text-stone uppercase tracking-wide mb-2">Build type</p>
-                <div className="bg-track rounded-lg p-1 flex gap-1 mb-4">
-                  {systems.filter(s => s.surface_type === 'wall' && (!selectedFamily || s.family === selectedFamily)).map(system => (
+              {surface === 'both' && (
+                <div className="bg-track rounded-lg p-1 flex gap-1" role="tablist" aria-label="Surface to edit">
+                  {(['floor', 'wall'] as const).map(sf => (
                     <button
-                      key={system.id}
-                      onClick={() => handleWallSystemChange(system.id)}
-                      className={`flex-1 py-2 px-3 rounded-md font-medium text-sm transition-all min-h-[44px] ${
-                        wallSystemId === system.id
-                          ? 'bg-bone text-basalt shadow-sm'
-                          : 'text-stone hover:text-ink'
+                      key={sf}
+                      role="tab"
+                      aria-selected={editSurface === sf}
+                      onClick={() => setEditSurface(sf)}
+                      className={`flex-1 py-2.5 px-3 rounded-md font-medium text-sm transition-all min-h-[44px] ${
+                        editSurface === sf ? 'bg-bone text-basalt shadow-sm' : 'text-stone hover:text-ink'
                       }`}
                     >
-                      {system.name.replace('Wall ', '')}
+                      {sf === 'floor' ? `Floor ${floorAreaNum}m²` : `Wall ${wallAreaNum}m²`}
                     </button>
                   ))}
                 </div>
-                <div className="space-y-3">
-                  {renderStageGroups(wallStageGroups as [string, { layers: any[] }][])}
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Single surface mode */}
-              <div className="bg-bone border border-line rounded-xl p-5">
-                <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3">Build type</p>
-                <div className="bg-track rounded-lg p-1 flex gap-1">
-                  {availableSystems.map(system => (
-                    <button
-                      key={system.id}
-                      onClick={() => {
-                        if (surface === 'floor') setFloorSystemId(system.id)
-                        else if (surface === 'wall') setWallSystemId(system.id)
-                        handleSystemChange(system.id)
-                      }}
-                      className={`flex-1 py-2.5 px-4 rounded-md font-medium text-sm transition-all min-h-[44px] ${
-                        selectedSystemId === system.id
-                          ? 'bg-bone text-basalt shadow-sm'
-                          : 'text-stone hover:text-ink'
-                      }`}
-                    >
-                      {system.name.replace('Floor ', '').replace('Wall ', '')}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              )}
 
-              {/* Layers */}
-              <div>
-                <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3 px-1">Layers</p>
-                <div className="space-y-4">
-                  {renderStageGroups(singleStageGroups as [string, { layers: any[] }][])}
-                </div>
+              <div className="space-y-3">
+                {surface === 'both'
+                  ? (editSurface === 'floor'
+                      ? renderStageSections(floorStageGroups as [string, { layers: any[] }][], 'floor_')
+                      : renderStageSections(wallStageGroups as [string, { layers: any[] }][], 'wall_'))
+                  : renderStageSections(singleStageGroups as [string, { layers: any[] }][], `${surface}_single_`)}
               </div>
             </>
           )}
@@ -1730,6 +1779,86 @@ export function Calculator() {
 
       <p className="text-center text-xs text-ash mt-8 hidden lg:block">© Magma Coatings Ltd</p>
       
+      {/* System picker sheet */}
+      {showSystemPicker && (
+        <div
+          className="fixed inset-0 z-[70] bg-basalt/50 flex items-end lg:items-center justify-center"
+          onClick={() => setShowSystemPicker(false)}
+          onKeyDown={e => { if (e.key === 'Escape') setShowSystemPicker(false) }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Choose a system"
+            onClick={e => e.stopPropagation()}
+            className="bg-bone w-full lg:max-w-md rounded-t-2xl lg:rounded-2xl max-h-[85vh] overflow-y-auto p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-medium text-basalt">{surface === 'both' ? 'Choose systems' : 'Choose a system'}</h2>
+              <button
+                onClick={() => setShowSystemPicker(false)}
+                aria-label="Close"
+                className="w-11 h-11 flex items-center justify-center rounded-lg text-stone hover:text-basalt"
+                autoFocus
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {surface === 'both' && (
+              <div className="bg-track rounded-lg p-1 flex gap-1">
+                {(['floor', 'wall'] as const).map(sf => (
+                  <button
+                    key={sf}
+                    onClick={() => setEditSurface(sf)}
+                    className={`flex-1 py-2.5 rounded-md font-medium text-sm min-h-[44px] ${
+                      editSurface === sf ? 'bg-bone text-basalt shadow-sm' : 'text-stone hover:text-ink'
+                    }`}
+                  >
+                    {sf === 'floor' ? 'Floor' : 'Wall'}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <p className="text-xs font-medium text-stone uppercase tracking-wide pt-1">{selectedFamily || 'Systems'}</p>
+            {pickerSystems.map(sys => {
+              const sel = pickerSelectedId === sys.id
+              return (
+                <button
+                  key={sys.id}
+                  onClick={() => pickSystem(sys.id)}
+                  aria-pressed={sel}
+                  className={`w-full flex gap-3 p-4 rounded-xl text-left bg-bone ${sel ? 'border-2 border-molten' : 'border border-line hover:border-stone'}`}
+                >
+                  <span className={`w-5 h-5 rounded-full shrink-0 mt-0.5 ${sel ? 'border-[6px] border-molten' : 'border-2 border-ash'}`} />
+                  <span className="min-w-0">
+                    <span className="block font-medium text-basalt">{sys.name}</span>
+                    {sys.description && <span className="block text-sm text-stone mt-1 leading-snug">{sys.description}</span>}
+                  </span>
+                </button>
+              )
+            })}
+
+            <p className="text-xs font-medium text-stone uppercase tracking-wide pt-2">Pick products yourself</p>
+            <button
+              onClick={() => { setSurface('custom'); setShowSystemPicker(false) }}
+              className="w-full flex gap-3 p-4 rounded-xl text-left bg-bone border border-dashed border-ash hover:border-stone"
+            >
+              <span className="w-5 h-5 rounded-full shrink-0 mt-0.5 border-2 border-ash" />
+              <span>
+                <span className="block font-medium text-basalt">Build your own</span>
+                <span className="block text-sm text-stone mt-1 leading-snug">Switch on exactly the products you need, each with its own area</span>
+              </span>
+            </button>
+
+            {surface === 'both' && (
+              <Button className="w-full mt-2" size="lg" onClick={() => setShowSystemPicker(false)}>Done</Button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Offer to save after copying or emailing an unsaved quote */}
       {offerSave && !showSaveModal && items.length > 0 && (
         <div
