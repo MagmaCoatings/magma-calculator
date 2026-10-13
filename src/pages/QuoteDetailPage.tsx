@@ -239,7 +239,7 @@ export function QuoteDetailPage() {
       return // No change
     }
 
-    const newLineTotal = editItemQty * item.unit_price
+    const newLineTotal = pennies(editItemQty * item.unit_price)
     const oldQty = item.quantity
 
     const { error } = await supabase
@@ -324,7 +324,7 @@ export function QuoteDetailPage() {
 
     setAddingProduct(true)
 
-    const lineTotal = newProductQty * product.price
+    const lineTotal = pennies(newProductQty * product.price)
     const maxOrder = Math.max(...items.map(i => i.display_order || 0), 0)
 
     const { data: newItem, error } = await supabase

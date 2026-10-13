@@ -154,6 +154,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Defer the Supabase call out of the auth callback (Supabase guidance: avoids a deadlock)
           setTimeout(() => {
             fetchProfile(userId).then(p => {
+              if (loadedProfileFor.current !== userId) return // a different user signed in meanwhile
+              if (!p) loadedProfileFor.current = null // failed: allow the next auth event to retry
               setProfile(p)
               setProfileLoading(false)
             })

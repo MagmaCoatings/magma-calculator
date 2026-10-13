@@ -253,6 +253,7 @@ export function Calculator() {
   // This updates prices/names but preserves user's layer selections
   useEffect(() => {
     async function onFocus() {
+      const seq = modeSeq.current // ignore if the user switches mode while this refresh is in flight
       const query = (systemId: string) => supabase
         .from('system_products')
         .select('*, product:products(*), stage:stages(*)')
@@ -263,16 +264,16 @@ export function Calculator() {
         // Refresh both floor and wall products
         if (floorSystemId) {
           const { data } = await query(floorSystemId)
-          if (data) setFloorProducts(data)
+          if (data && seq === modeSeq.current) setFloorProducts(data)
         }
         if (wallSystemId) {
           const { data } = await query(wallSystemId)
-          if (data) setWallProducts(data)
+          if (data && seq === modeSeq.current) setWallProducts(data)
         }
       } else if (selectedSystemId) {
         // Single surface mode
         const { data } = await query(selectedSystemId)
-        if (data) setSystemProducts(data)
+        if (data && seq === modeSeq.current) setSystemProducts(data)
       }
       // Note: NOT calling initLayerStates - preserves user selections
     }
@@ -297,6 +298,9 @@ export function Calculator() {
   async function handleSystemChange(systemId: string) {
     const seq = ++modeSeq.current
     setSelectedSystemId(systemId)
+    // Clear straight away so no previous mode's layers are counted while loading (or if it fails)
+    setSystemProducts([])
+    setLayerStates({})
     const data = await fetchSystemProducts(systemId)
     if (!data || seq !== modeSeq.current) return
     setSystemProducts(data)
