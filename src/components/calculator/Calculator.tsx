@@ -813,8 +813,9 @@ export function Calculator() {
       }
     }
     
-    const selProdMin = selectedProduct ? effMinCoats(selectedProduct) : 1
-    const selProdMax = selectedProduct ? effMaxCoats(selectedProduct) : 1
+    const isPerJob = !!perJobQty(selectedProduct?.product)
+    const selProdMin = selectedProduct && !isPerJob ? effMinCoats(selectedProduct) : 1
+    const selProdMax = selectedProduct && !isPerJob ? effMaxCoats(selectedProduct) : 1
     const hasCoatOptions = selectedProduct && selProdMin < selProdMax
     const hasPigmentOption = selectedProduct?.has_pigment
     const showFullCard = state.enabled || !layer.isOptional || hasCoatOptions || hasPigmentOption
@@ -1169,7 +1170,7 @@ export function Calculator() {
                 const multi = reps.length > 1
                 const selected = reps.find(p => p.product_id === st.selectedProductId) || reps[0]
                 const selMin = effMinCoats(selected), selMax = effMaxCoats(selected)
-                const hasCoats = selMin < selMax
+                const hasCoats = selMin < selMax && !perJobQty(selected.product)
                 const selOverMesh = effOverMesh(selected), selStd = effCoverage(selected)
                 const isDual = selOverMesh != null && selOverMesh !== selStd
                 const effApp: 'mesh' | 'standard' = st.application ?? (meshOn ? 'mesh' : 'standard')
@@ -1330,9 +1331,9 @@ export function Calculator() {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-[1fr_340px] gap-8">
-        {/* Configuration */}
-        <div className="space-y-5">
+      <div className="grid lg:grid-cols-[minmax(0,1fr)_340px] gap-8">
+        {/* Configuration (min-w-0: long summaries truncate instead of widening the column) */}
+        <div className="space-y-5 min-w-0">
           {/* Surface type */}
           <div className="bg-bone border border-line rounded-xl p-5">
             <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3">Surface type</p>
@@ -1627,11 +1628,11 @@ export function Calculator() {
         </div>
 
         {/* Results */}
-        <div id="materials-section" className="lg:sticky lg:top-6 h-fit">
-          <div className="bg-bone border border-line rounded-xl p-5 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="font-medium text-basalt">Materials</h2>
-              <div className="flex items-center gap-4">
+        <div id="materials-section" className="lg:sticky lg:top-20 h-fit [overflow-anchor:none]">
+          <div className="bg-bone border border-line rounded-xl p-5 shadow-sm flex flex-col lg:max-h-[calc(100vh-14rem)]">
+            <div className="flex justify-between items-center mb-4 shrink-0">
+              <h2 className="font-medium text-basalt">Materials{items.length > 0 && <span className="text-stone font-normal"> ({items.length})</span>}</h2>
+              <div className="flex items-center gap-4 lg:hidden">
                 <button
                   onClick={emailOrder}
                   disabled={items.length === 0}
@@ -1658,7 +1659,7 @@ export function Calculator() {
               </p>
             ) : (
               <>
-                <div className="space-y-1 mb-4">
+                <div className="space-y-1 mb-4 lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:-mx-5 lg:px-5">
                   {items.map((item, idx) => (
                     <div key={idx} className="flex justify-between py-2 border-b border-line-soft last:border-0">
                       <div>
@@ -1673,6 +1674,7 @@ export function Calculator() {
                   ))}
                 </div>
 
+                <div className="shrink-0">
                 {/* Legend for shared materials */}
                 {surface === 'both' && items.some(item => item.name.includes('✦')) && (
                   <div className="bg-molten-tint border border-molten/20 rounded-lg px-3 py-2 mb-4">
@@ -1709,18 +1711,31 @@ export function Calculator() {
                 <p className="text-xs text-stone mt-3">
                   Pallet / Delivery Costs: TBC — quoted at time of order
                 </p>
+                </div>
               </>
             )}
           </div>
 
-          <Button 
-            className="w-full mt-4 hidden lg:flex" 
-            size="lg"
-            disabled={items.length === 0}
-            onClick={openSave}
-          >
-            Save Quote
-          </Button>
+          {/* Desktop actions: always visible under the totals (mobile uses the bottom bar) */}
+          <div className="hidden lg:block mt-4 space-y-2">
+            <Button
+              className="w-full"
+              size="lg"
+              disabled={items.length === 0}
+              onClick={openSave}
+            >
+              Save Quote
+            </Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" className="w-full min-h-[44px]" disabled={items.length === 0} onClick={emailOrder} title="Email this order to Magma, no need to save first">
+                <Mail className="w-4 h-4 mr-1.5" /> Email order
+              </Button>
+              <Button variant="outline" className="w-full min-h-[44px]" disabled={items.length === 0} onClick={copyList} title="Copy the materials list, no need to save first">
+                {copied ? <Check className="w-4 h-4 mr-1.5" /> : <Copy className="w-4 h-4 mr-1.5" />}
+                {copied ? 'Copied!' : 'Copy list'}
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1737,14 +1752,14 @@ export function Calculator() {
           <div className="flex gap-2">
             <Button 
               variant="outline"
-              className="flex-1 min-h-[48px]"
+              className="flex-1 min-w-0 px-3 min-h-[48px]"
               onClick={() => {
                 const el = document.getElementById('materials-section')
                 el?.scrollIntoView({ behavior: 'smooth' })
               }}
             >
-              <ChevronUp className="w-4 h-4 mr-1" />
-              Materials ({items.length})
+              <ChevronUp className="w-4 h-4 mr-1 shrink-0" />
+              <span className="truncate">List ({items.length})</span>
             </Button>
             <Button
               variant="outline"
@@ -1754,7 +1769,10 @@ export function Calculator() {
               aria-label="Copy materials list"
               title="Copy list"
             >
-              {copied ? <Check className="w-4 h-4 text-sage" /> : <Copy className="w-4 h-4" />}
+              <span className="flex flex-col items-center leading-none gap-1">
+                {copied ? <Check className="w-4 h-4 text-sage" /> : <Copy className="w-4 h-4" />}
+                <span className="text-[10px]">{copied ? 'Copied' : 'Copy'}</span>
+              </span>
             </Button>
             <Button
               variant="outline"
@@ -1764,10 +1782,13 @@ export function Calculator() {
               aria-label="Email order to Magma"
               title="Email order"
             >
-              <Mail className="w-4 h-4" />
+              <span className="flex flex-col items-center leading-none gap-1">
+                <Mail className="w-4 h-4" />
+                <span className="text-[10px]">Email</span>
+              </span>
             </Button>
             <Button
-              className="flex-1 min-h-[48px]"
+              className="flex-1 min-w-0 px-3 min-h-[48px] whitespace-nowrap"
               disabled={items.length === 0}
               onClick={openSave}
             >
