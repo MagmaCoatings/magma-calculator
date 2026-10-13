@@ -1,5 +1,6 @@
 import { Spinner } from '@/components/ui/spinner'
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { logCreate, logUpdate, logDelete } from '@/lib/activityLog'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -7,10 +8,23 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/formatters'
 import type { Product, ProductCategory } from '@/lib/types'
-import { Plus, Pencil, X, Check, Search, ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
+import { Plus, Pencil, X, Check, Search, ChevronUp, ChevronDown, Trash2, Bell } from 'lucide-react'
 
 export function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
+  const navigate = useNavigate()
+  // Offer to tell installers about a price change or a new product (Admin > Notifications > Automatic)
+  const [autoFlags, setAutoFlags] = useState<{ price: boolean; product: boolean }>({ price: false, product: false })
+  const [announce, setAnnounce] = useState<{ kind: 'price' | 'product'; title: string; body: string; summary: string } | null>(null)
+  useEffect(() => {
+    supabase.from('notification_settings').select('auto_price, auto_product').eq('id', 1).maybeSingle()
+      .then(({ data }) => { if (data) setAutoFlags({ price: !!data.auto_price, product: !!data.auto_product }) })
+  }, [])
+  function openAnnouncement() {
+    if (!announce) return
+    const q = new URLSearchParams({ title: announce.title, body: announce.body, kind: announce.kind, category: 'products', link: 'calc' })
+    navigate(`/admin/notifications?${q}`)
+  }
   const [categories, setCategories] = useState<ProductCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -150,6 +164,17 @@ export function ProductsPage() {
       // Log activity
       logUpdate('product', id, editForm.name, { price, pack_size })
 
+      const before = products.find(p => p.id === id)
+      if (autoFlags.price && before && Number(before.price) !== price) {
+        const was = formatCurrency(Number(before.price)), now = formatCurrency(price)
+        setAnnounce({
+          kind: 'price',
+          summary: `${editForm.name}: £${was} to £${now}`,
+          title: `Price update: ${editForm.name}`.slice(0, 80),
+          body: `${editForm.name} is now £${now} (was £${was}). Quotes you have already saved keep their prices.`.slice(0, 200),
+        })
+      }
+
       setProducts(products.map(p => p.id === id ? {
         ...p,
         name: editForm.name,
@@ -264,6 +289,14 @@ export function ProductsPage() {
     } else {
       // Log activity
       logCreate('product', data.id, data.name, { code: data.code, price: data.price })
+      if (autoFlags.product) {
+        setAnnounce({
+          kind: 'product',
+          summary: data.name,
+          title: `New: ${data.name}`.slice(0, 80),
+          body: `${data.name} is now available at £${formatCurrency(Number(data.price))}. Find it in the calculator.`.slice(0, 200),
+        })
+      }
       
       setProducts([...products, data])
       setShowAddForm(false)
@@ -304,6 +337,16 @@ export function ProductsPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
+      {announce && (
+        <div role="status" className="mb-4 bg-molten-tint border border-molten/30 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3">
+          <Bell className="w-5 h-5 text-molten-ink shrink-0" />
+          <p className="text-sm text-basalt flex-1 min-w-[200px]">
+            {announce.kind === 'price' ? 'Price changed' : 'New product added'}: <strong>{announce.summary}</strong>. Tell installers?
+          </p>
+          <Button size="sm" onClick={openAnnouncement}>Write notification</Button>
+          <Button size="sm" variant="outline" onClick={() => setAnnounce(null)}>Not now</Button>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-basalt">Products</h1>
         <div className="flex gap-2">

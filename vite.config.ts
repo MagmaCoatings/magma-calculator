@@ -10,6 +10,10 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate', // new deploys are picked up automatically — no reinstall
+      // Our own service worker (src/sw.ts): the app shell caching as before, plus phone alerts
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       includeAssets: ['favicon-32x32.png', 'apple-touch-icon.png', 'magma-logo.jpg'],
       manifest: {
         name: 'Magma Calculator',
@@ -27,19 +31,10 @@ export default defineConfig({
           { src: 'pwa-maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-      workbox: {
-        // Cache the app shell + assets so it loads offline / instantly; HTML stays network-first.
+      injectManifest: {
+        // Cache the app shell + assets so it loads offline / instantly (routing lives in src/sw.ts)
         globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff2}'],
-        navigateFallbackDenylist: [/^\/api/],
-        cleanupOutdatedCaches: true,
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // app bundle is ~2.1MB (code-split later)
-        // Supabase API responses are never cached — always live data.
-        runtimeCaching: [
-          {
-            urlPattern: ({ url }) => url.origin.includes('supabase.co'),
-            handler: 'NetworkOnly',
-          },
-        ],
       },
     }),
   ],

@@ -18,6 +18,9 @@ import { ActivityLogPage } from '@/pages/admin/ActivityLogPage'
 import { SystemsPage } from '@/pages/admin/SystemsPage'
 import { StagesPage } from '@/pages/admin/StagesPage'
 import { SettingsPage } from '@/pages/admin/SettingsPage'
+import { NotificationsProvider } from '@/hooks/useNotifications'
+import { NotificationsPage } from '@/pages/NotificationsPage'
+import { NotificationsAdminPage } from '@/pages/admin/NotificationsAdminPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth()
@@ -106,6 +109,13 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
       
+      <Route path="/notifications" element={
+        <ProtectedRoute>
+          <Header />
+          <NotificationsPage />
+        </ProtectedRoute>
+      } />
+
       <Route path="/profile" element={
         <ProtectedRoute>
           <Header />
@@ -170,6 +180,14 @@ function AppRoutes() {
         </AdminRoute>
       } />
       
+      <Route path="/admin/notifications" element={
+        <AdminRoute>
+          <AdminLayout>
+            <NotificationsAdminPage />
+          </AdminLayout>
+        </AdminRoute>
+      } />
+
       <Route path="/admin/settings" element={
         <AdminRoute>
           <AdminLayout>
@@ -188,9 +206,11 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <div className="min-h-screen bg-limestone">
-          <AppRoutes />
-        </div>
+        <NotificationsProvider>
+          <div className="min-h-screen bg-limestone">
+            <AppRoutes />
+          </div>
+        </NotificationsProvider>
       </AuthProvider>
     </ErrorBoundary>
   )

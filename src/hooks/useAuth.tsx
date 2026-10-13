@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase, getClientLocation, getDeviceType, getBrowser, getOS } from '@/lib/supabase'
 import type { Profile } from '@/lib/types'
+import { releasePushOnSignOut } from '@/lib/push'
 
 interface AuthContextType {
   user: User | null
@@ -198,6 +199,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    // While still signed in, detach this device from the user's phone alerts (never block sign-out)
+    await Promise.race([
+      releasePushOnSignOut().catch(() => undefined),
+      new Promise(resolve => setTimeout(resolve, 3000)),
+    ])
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
