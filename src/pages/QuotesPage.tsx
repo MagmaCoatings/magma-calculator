@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { formatCurrency } from '@/lib/formatters'
+import { formatCurrency, surfaceLabel, areaLabel } from '@/lib/formatters'
 import { Search, Plus, FileText, Clock, CheckCircle, XCircle, ChevronRight, ChevronLeft, User } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 20
@@ -241,12 +241,10 @@ export function QuotesPage() {
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-ash mt-2">
-                      <span className="capitalize">{quote.surface_type}</span>
+                      <span>{surfaceLabel(quote.surface_type)}</span>
                       <span aria-hidden="true">•</span>
                       <span className="whitespace-nowrap">
-                        {quote.floor_area > 0 && `${quote.floor_area}m² floor`}
-                        {quote.floor_area > 0 && quote.wall_area > 0 && ' + '}
-                        {quote.wall_area > 0 && `${quote.wall_area}m² wall`}
+                        {areaLabel(quote.surface_type, quote.floor_area, quote.wall_area)}
                       </span>
                       <span aria-hidden="true">•</span>
                       <span className="whitespace-nowrap">{formatDate(quote.created_at)}</span>

@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { formatCurrency } from '@/lib/formatters'
+import { formatCurrency, surfaceLabel, areaLabel, quoteVatRate, vatLabel, pennies } from '@/lib/formatters'
 import { ArrowLeft, Pencil, Save, Copy, Trash2, FileText, Send, CheckCircle, XCircle, Plus, Download, Mail, History, Clock } from 'lucide-react'
 import { QuotePDF } from '@/components/QuotePDF'
 import { ProductPicker } from '@/components/ProductPicker'
@@ -35,6 +35,8 @@ interface Quote {
   status: string
   created_at: string
   updated_at: string
+  custom_colour_name?: string | null
+  custom_colour_hex?: string | null
 }
 
 interface QuoteItem {
@@ -238,7 +240,6 @@ export function QuoteDetailPage() {
     }
 
     const newLineTotal = editItemQty * item.unit_price
-    const oldLineTotal = item.line_total
     const oldQty = item.quantity
 
     const { error } = await supabase
@@ -260,17 +261,8 @@ export function QuoteDetailPage() {
     )
     setItems(updatedItems)
 
-    // Recalculate totals
-    const newSubtotal = quote.subtotal - oldLineTotal + newLineTotal
-    const newVat = newSubtotal * 0.2
-    const newTotal = newSubtotal + newVat
-
-    await supabase
-      .from('quotes')
-      .update({ subtotal: newSubtotal, vat: newVat, total: newTotal, updated_at: new Date().toISOString() })
-      .eq('id', quote.id)
-
-    setQuote({ ...quote, subtotal: newSubtotal, vat: newVat, total: newTotal })
+    // Recalculate totals from every line, at the quote's own VAT rate
+    await saveTotals(updatedItems)
     setEditingItemId(null)
   }
 
@@ -295,17 +287,8 @@ export function QuoteDetailPage() {
     const updatedItems = items.filter(i => i.id !== item.id)
     setItems(updatedItems)
 
-    // Recalculate totals
-    const newSubtotal = quote.subtotal - item.line_total
-    const newVat = newSubtotal * 0.2
-    const newTotal = newSubtotal + newVat
-
-    await supabase
-      .from('quotes')
-      .update({ subtotal: newSubtotal, vat: newVat, total: newTotal, updated_at: new Date().toISOString() })
-      .eq('id', quote.id)
-
-    setQuote({ ...quote, subtotal: newSubtotal, vat: newVat, total: newTotal })
+    // Recalculate totals from every line, at the quote's own VAT rate
+    await saveTotals(updatedItems)
   }
 
   async function fetchProducts() {
@@ -370,19 +353,28 @@ export function QuoteDetailPage() {
     // Update local state
     setItems([...items, newItem])
 
-    // Recalculate totals
-    const newSubtotal = quote.subtotal + lineTotal
-    const newVat = newSubtotal * 0.2
-    const newTotal = newSubtotal + newVat
+    // Recalculate totals from every line, at the quote's own VAT rate
+    await saveTotals([...items, newItem])
+    setShowAddProduct(false)
+    setAddingProduct(false)
+  }
 
-    await supabase
+  // Recalculate and store totals from all lines; keeps the VAT rate the quote was saved with
+  async function saveTotals(allItems: QuoteItem[]) {
+    if (!quote) return
+    const rate = quoteVatRate(quote.subtotal, quote.vat)
+    const newSubtotal = pennies(allItems.reduce((sum, i) => sum + Number(i.line_total || 0), 0))
+    const newVat = pennies(newSubtotal * rate)
+    const newTotal = pennies(newSubtotal + newVat)
+    const { data, error } = await supabase
       .from('quotes')
       .update({ subtotal: newSubtotal, vat: newVat, total: newTotal, updated_at: new Date().toISOString() })
       .eq('id', quote.id)
-
+      .select('id')
+    if (error || !data || data.length === 0) {
+      alert('The line was changed but the quote totals could not be saved. Please refresh and check this quote.' + (error ? '\n\n' + error.message : ''))
+    }
     setQuote({ ...quote, subtotal: newSubtotal, vat: newVat, total: newTotal })
-    setShowAddProduct(false)
-    setAddingProduct(false)
   }
 
   async function duplicateQuote() {
@@ -407,6 +399,9 @@ export function QuoteDetailPage() {
         vat: quote.vat,
         total: quote.total,
         status: 'draft',
+        created_by: user?.id,
+        custom_colour_name: quote.custom_colour_name ?? null,
+        custom_colour_hex: quote.custom_colour_hex ?? null,
       })
       .select()
       .single()
@@ -428,7 +423,12 @@ export function QuoteDetailPage() {
         display_order: item.display_order,
       }))
 
-      await supabase.from('quote_items').insert(newItems)
+      const { error: itemsError } = await supabase.from('quote_items').insert(newItems)
+      if (itemsError) {
+        await supabase.from('quotes').delete().eq('id', newQuote.id)
+        alert('Error duplicating quote lines, so the copy was not created.\n\n' + itemsError.message)
+        return
+      }
     }
 
     // Log duplication on the new quote
@@ -447,7 +447,7 @@ export function QuoteDetailPage() {
       `${quote?.project_name ? `Project: ${quote.project_name}\n` : ''}` +
       `\n${list}\n\n` +
       `Subtotal: £${formatCurrency(quote?.subtotal || 0)}\n` +
-      `VAT (20%): £${formatCurrency(quote?.vat || 0)}\n` +
+      `${vatLabel(quoteVatRate(quote?.subtotal || 0, quote?.vat || 0))}: £${formatCurrency(quote?.vat || 0)}\n` +
       `Total: £${formatCurrency(quote?.total || 0)}`
 
     navigator.clipboard.writeText(text)
@@ -457,11 +457,7 @@ export function QuoteDetailPage() {
   function sendQuoteEmail() {
     if (!quote) return
 
-    const getAreaDisplay = () => {
-      if (quote.surface_type === 'floor') return `${quote.floor_area}m² floor`
-      if (quote.surface_type === 'wall') return `${quote.wall_area}m² wall`
-      return `${quote.floor_area}m² floor + ${quote.wall_area}m² wall`
-    }
+    const getAreaDisplay = () => areaLabel(quote.surface_type, quote.floor_area, quote.wall_area)
 
     const materialsList = items.map(item => 
       `${item.quantity} × ${item.product_name} @ £${formatCurrency(item.unit_price)} each = £${formatCurrency(item.line_total)}`
@@ -492,7 +488,7 @@ export function QuoteDetailPage() {
 
 QUOTE REFERENCE: ${quote.reference}
 ${quote.client_name ? `\nClient: ${quote.client_name}` : ''}
-Surface: ${quote.surface_type.charAt(0).toUpperCase() + quote.surface_type.slice(1)}
+Surface: ${surfaceLabel(quote.surface_type)}
 Area: ${getAreaDisplay()}
 
 MATERIALS
@@ -500,7 +496,7 @@ ${materialsList}
 
 TOTALS
 Subtotal: £${formatCurrency(quote.subtotal)}
-VAT (20%): £${formatCurrency(quote.vat)}
+${vatLabel(quoteVatRate(quote.subtotal, quote.vat))}: £${formatCurrency(quote.vat)}
 Total: £${formatCurrency(quote.total)}
 
 PALLET / DELIVERY COSTS: TBC
@@ -708,16 +704,25 @@ ${signature}`
                 </div>
                 <div>
                   <span className="text-sm text-stone">Surface Type</span>
-                  <p className="font-medium">{quote.surface_type}</p>
+                  <p className="font-medium">{surfaceLabel(quote.surface_type)}</p>
                 </div>
                 <div>
                   <span className="text-sm text-stone">Area</span>
                   <p className="font-medium">
-                    {quote.surface_type === 'floor' && `${quote.floor_area}m²`}
-                    {quote.surface_type === 'wall' && `${quote.wall_area}m²`}
-                    {quote.surface_type === 'both' && `${quote.floor_area}m² floor + ${quote.wall_area}m² wall`}
+                    {areaLabel(quote.surface_type, quote.floor_area, quote.wall_area)}
                   </p>
                 </div>
+                {quote.custom_colour_name && (
+                  <div>
+                    <span className="text-sm text-stone">Colour</span>
+                    <p className="font-medium flex items-center gap-2">
+                      {quote.custom_colour_hex && (
+                        <span className="inline-block w-4 h-4 rounded border border-line" style={{ backgroundColor: quote.custom_colour_hex }} />
+                      )}
+                      {quote.custom_colour_name}
+                    </p>
+                  </div>
+                )}
                 {quote.notes && (
                   <div>
                     <span className="text-sm text-stone">Notes</span>
@@ -741,7 +746,7 @@ ${signature}`
                 <span className="font-medium">£{formatCurrency(quote.subtotal)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-stone">VAT (20%)</span>
+                <span className="text-stone">{vatLabel(quoteVatRate(quote.subtotal, quote.vat))}</span>
                 <span className="font-medium">£{formatCurrency(quote.vat)}</span>
               </div>
               <div className="border-t border-line-soft pt-2 mt-2">

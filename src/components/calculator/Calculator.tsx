@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useColours } from '@/hooks/useProducts'
 import { useSettings } from '@/hooks/useSettings'
 import { useAuth } from '@/hooks/useAuth'
-import { formatCurrency } from '@/lib/formatters'
+import { formatCurrency, vatLabel } from '@/lib/formatters'
 import { Button } from '@/components/ui/button'
 import { InfoTip } from '@/components/ui/InfoTip'
 import { Copy, Check, ChevronUp, ChevronDown, Package } from 'lucide-react'
@@ -182,25 +182,10 @@ export function Calculator() {
       const uniqueFamilies = [...new Set(regularSystems.map(s => s.family).filter(Boolean))] as string[]
       setFamilies(uniqueFamilies)
 
-      // Auto-select first family if there are multiple
+      // Auto-select first family if there are multiple.
+      // The surface effect below picks and loads the floor/wall systems for it.
       const initialFamily = uniqueFamilies.length > 0 ? uniqueFamilies[0] : null
       setSelectedFamily(initialFamily)
-
-      // Filter by initial family
-      const familySystems = initialFamily
-        ? regularSystems.filter(s => s.family === initialFamily)
-        : regularSystems
-      
-      // Auto-select first floor and wall systems from filtered list
-      const floorSystem = familySystems.find(s => s.surface_type === 'floor')
-      const wallSystem = familySystems.find(s => s.surface_type === 'wall')
-      if (floorSystem) {
-        setFloorSystemId(floorSystem.id)
-        handleSystemChange(floorSystem.id)
-      }
-      if (wallSystem) {
-        setWallSystemId(wallSystem.id)
-      }
     } catch {
       setError('Failed to load systems. Please check your connection and try again.')
     } finally {
@@ -227,22 +212,42 @@ export function Calculator() {
     }
   }, [settingsLoading, settings, settingsApplied])
 
-  // Auto-select appropriate system when surface type changes
+  // Load sequencing: every load records a sequence number, and results from a load
+  // that has since been superseded (user switched surface/system again) are discarded.
+  // modeSeq covers whole-mode loads; sideSeq covers the floor/wall halves of Floor + Wall.
+  const modeSeq = useRef(0)
+  const sideSeq = useRef({ floor: 0, wall: 0 })
+
+  // (Re)load systems whenever the surface or family changes. Layer states are always
+  // rebuilt for the new mode, so floor_/wall_ keys never leak into single-surface mode.
   useEffect(() => {
-    if (systems.length === 0) return
-    
-    let targetSystem: System | undefined
-    
-    if (surface === 'floor' || surface === 'both') {
-      targetSystem = systems.find(s => s.surface_type === 'floor')
-    } else if (surface === 'wall') {
-      targetSystem = systems.find(s => s.surface_type === 'wall')
+    if (systems.length === 0 || surface === 'custom') return
+
+    const familySystems = systems.filter(s => !selectedFamily || s.family === selectedFamily)
+    // Keep the user's current build type for a surface if it belongs to this family
+    const pick = (type: 'floor' | 'wall', currentId: string | null) =>
+      familySystems.find(s => s.id === currentId && s.surface_type === type) ??
+      familySystems.find(s => s.surface_type === type)
+    const floorSys = pick('floor', floorSystemId)
+    const wallSys = pick('wall', wallSystemId)
+    if ((floorSys?.id ?? null) !== floorSystemId) setFloorSystemId(floorSys?.id ?? null)
+    if ((wallSys?.id ?? null) !== wallSystemId) setWallSystemId(wallSys?.id ?? null)
+
+    if (surface === 'both') {
+      loadBothSurfaces(floorSys?.id ?? null, wallSys?.id ?? null)
+    } else {
+      const target = surface === 'floor' ? floorSys : wallSys
+      if (target) {
+        handleSystemChange(target.id)
+      } else {
+        modeSeq.current++
+        setSelectedSystemId(null)
+        setSystemProducts([])
+        setLayerStates({})
+      }
     }
-    
-    if (targetSystem && targetSystem.id !== selectedSystemId) {
-      handleSystemChange(targetSystem.id)
-    }
-  }, [surface, systems])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [surface, systems, selectedFamily])
 
   // Auto-refresh product data when window regains focus (picks up admin changes)
   // This updates prices/names but preserves user's layer selections
@@ -275,87 +280,76 @@ export function Calculator() {
     return () => window.removeEventListener('focus', onFocus)
   }, [surface, selectedSystemId, floorSystemId, wallSystemId])
 
-  // Load system products when system changes (for single surface mode)
-  async function handleSystemChange(systemId: string) {
-    setSelectedSystemId(systemId)
-    
-    try {
-      const { data } = await supabase
-        .from('system_products')
-        .select('*, product:products(*), stage:stages(*)')
-        .eq('system_id', systemId)
-        .order('display_order')
-
-      if (data) {
-        setSystemProducts(data)
-        
-        // Initialize layer states from defaults
-        initLayerStates(data, '')
-      }
-    } catch {
-      // Silently fail - products will be empty, user can retry via system selection
-      console.error('Failed to load system products')
+  async function fetchSystemProducts(systemId: string): Promise<SystemProduct[] | null> {
+    const { data, error: queryError } = await supabase
+      .from('system_products')
+      .select('*, product:products(*), stage:stages(*)')
+      .eq('system_id', systemId)
+      .order('display_order')
+    if (queryError) {
+      console.error('Failed to load system products', queryError)
+      return null
     }
+    return (data as SystemProduct[]) || []
   }
 
-  // Handle family change - reset system selections
+  // Load system products for single surface mode (Floor or Wall)
+  async function handleSystemChange(systemId: string) {
+    const seq = ++modeSeq.current
+    setSelectedSystemId(systemId)
+    const data = await fetchSystemProducts(systemId)
+    if (!data || seq !== modeSeq.current) return
+    setSystemProducts(data)
+    setLayerStates(buildLayerStates(data, ''))
+  }
+
+  // Handle family change - the surface effect reloads systems for the new family
   function handleFamilyChange(family: string) {
     setSelectedFamily(family)
-    
-    // Clear current selections
-    setSelectedSystemId(null)
     setFloorSystemId(null)
     setWallSystemId(null)
-    setSystemProducts([])
-    setFloorProducts([])
-    setWallProducts([])
+  }
+
+  // Load both surfaces together when entering Floor + Wall mode
+  async function loadBothSurfaces(floorId: string | null, wallId: string | null) {
+    const seq = ++modeSeq.current
+    const fSeq = ++sideSeq.current.floor
+    const wSeq = ++sideSeq.current.wall
     setLayerStates({})
-    
-    // Auto-select first systems from the new family
-    const familySystems = systems.filter(s => s.family === family)
-    const floorSystem = familySystems.find(s => s.surface_type === 'floor')
-    const wallSystem = familySystems.find(s => s.surface_type === 'wall')
-    
-    if (floorSystem) {
-      setFloorSystemId(floorSystem.id)
-      if (surface === 'floor' || surface === 'both') {
-        handleSystemChange(floorSystem.id)
-      }
+    const [f, w] = await Promise.all([
+      floorId ? fetchSystemProducts(floorId) : Promise.resolve([] as SystemProduct[]),
+      wallId ? fetchSystemProducts(wallId) : Promise.resolve([] as SystemProduct[]),
+    ])
+    if (seq !== modeSeq.current) return
+    const next: { [key: string]: LayerState } = {}
+    if (f && fSeq === sideSeq.current.floor) {
+      setFloorProducts(f)
+      Object.assign(next, buildLayerStates(f, 'floor_'))
     }
-    if (wallSystem) {
-      setWallSystemId(wallSystem.id)
-      if (surface === 'both') {
-        loadSurfaceProducts(wallSystem.id, 'wall')
-      }
+    if (w && wSeq === sideSeq.current.wall) {
+      setWallProducts(w)
+      Object.assign(next, buildLayerStates(w, 'wall_'))
     }
+    setLayerStates(prev => ({ ...prev, ...next }))
   }
 
-  // Load products for a specific surface in "both" mode
+  // Reload one half of Floor + Wall mode (user changed that surface's build type)
   async function loadSurfaceProducts(systemId: string, surfaceType: 'floor' | 'wall') {
-    try {
-      const { data } = await supabase
-        .from('system_products')
-        .select('*, product:products(*), stage:stages(*)')
-        .eq('system_id', systemId)
-        .order('display_order')
-
-      if (data) {
-        if (surfaceType === 'floor') {
-          setFloorProducts(data)
-          initLayerStates(data, 'floor_', true)
-        } else {
-          setWallProducts(data)
-          initLayerStates(data, 'wall_', true)
-        }
-      }
-    } catch {
-      // Silently fail - products will be empty, user can retry via system selection
-      console.error('Failed to load surface products')
-    }
+    const prefix = `${surfaceType}_`
+    const seq = modeSeq.current
+    const sSeq = ++sideSeq.current[surfaceType]
+    const data = await fetchSystemProducts(systemId)
+    if (!data || seq !== modeSeq.current || sSeq !== sideSeq.current[surfaceType]) return
+    if (surfaceType === 'floor') setFloorProducts(data)
+    else setWallProducts(data)
+    setLayerStates(prev => {
+      const kept = Object.fromEntries(Object.entries(prev).filter(([k]) => !k.startsWith(prefix)))
+      return { ...kept, ...buildLayerStates(data, prefix) }
+    })
   }
 
-  // Initialize layer states with optional prefix and merge mode
-  function initLayerStates(data: SystemProduct[], prefix: string, merge = false) {
+  // Build default layer states for a system's products, keys prefixed per surface
+  function buildLayerStates(data: SystemProduct[], prefix: string) {
     const newStates: { [key: string]: LayerState } = {}
     
     data.forEach(sp => {
@@ -379,11 +373,7 @@ export function Calculator() {
       }
     })
     
-    if (merge) {
-      setLayerStates(prev => ({ ...prev, ...newStates }))
-    } else {
-      setLayerStates(newStates)
-    }
+    return newStates
   }
 
   // Handle floor/wall system change in "both" mode
@@ -397,16 +387,6 @@ export function Calculator() {
     loadSurfaceProducts(systemId, 'wall')
   }
 
-  // Load both systems when switching to "both" mode
-  useEffect(() => {
-    if (surface === 'both' && floorSystemId && wallSystemId) {
-      // Clear existing state and load both
-      setLayerStates({})
-      loadSurfaceProducts(floorSystemId, 'floor')
-      loadSurfaceProducts(wallSystemId, 'wall')
-    }
-  }, [surface])
-
   function toggleLayer(key: string) {
     setLayerStates(prev => ({
       ...prev,
@@ -416,7 +396,8 @@ export function Calculator() {
 
   function selectProduct(key: string, productId: string) {
     // Find the system product to get its pigment_default_on value
-    const sp = systemProducts.find(p => p.product_id === productId)
+    const pool = key.startsWith('floor_') ? floorProducts : key.startsWith('wall_') ? wallProducts : systemProducts
+    const sp = pool.find(p => p.product_id === productId)
     const pigmentDefault = sp?.has_pigment ? (sp.pigment_default_on !== false) : false
     
     setLayerStates(prev => ({
@@ -475,6 +456,12 @@ export function Calculator() {
     return Object.entries(stages)
       .sort(([, a], [, b]) => a.stageOrder - b.stageOrder)
   }
+
+  // The colour actually in use: a custom colour replaces the swatch entirely
+  const activeColourName = useCustomColour ? (customColourName.trim() || 'Custom') : selectedColour.name
+  const activeColourIsNatural = useCustomColour
+    ? customColourName.toLowerCase().includes('natural')
+    : selectedColour.name.toLowerCase().includes('natural')
 
   // Calculate materials
   function calculate() {
@@ -562,10 +549,8 @@ export function Calculator() {
         })
         if (st.pigment && sp.has_pigment) pigPacks += units
       }
-      const isNatural = selectedColour.name.toLowerCase().includes('natural') || (useCustomColour && customColourName.toLowerCase().includes('natural'))
-      if (pigPacks > 0 && !isNatural) {
-        const colourName = useCustomColour ? (customColourName || 'Custom') : selectedColour.name
-        items.push({ name: `Pigment - ${colourName}`, qty: `${pigPacks} pot${pigPacks > 1 ? 's' : ''}`, units: pigPacks, unitSize: 'pot', cost: pigPacks * settings.pigment_price, stageOrder: 999, productOrder: 0, surfaceType: 3 })
+      if (pigPacks > 0 && !activeColourIsNatural) {
+        items.push({ name: `Pigment - ${activeColourName}`, qty: `${pigPacks} pot${pigPacks > 1 ? 's' : ''}`, units: pigPacks, unitSize: 'pot', cost: pigPacks * settings.pigment_price, stageOrder: 999, productOrder: 0, surfaceType: 3 })
       }
       items.sort((a, b) => a.stageOrder - b.stageOrder || a.productOrder - b.productOrder)
       const subtotal = items.reduce((s, i) => s + i.cost, 0)
@@ -672,16 +657,12 @@ export function Calculator() {
 
     // Add pigment pots (1 per pack of pigmented product)
     // Skip if "Natural" colour is selected (no pigment needed)
-    const isNaturalColour = selectedColour.name.toLowerCase().includes('natural') || 
-                            (useCustomColour && customColourName.toLowerCase().includes('natural'))
-    
-    if (totalPigmentPacks > 0 && !isNaturalColour) {
+    if (totalPigmentPacks > 0 && !activeColourIsNatural) {
       const allProds = surface === 'both' ? [...floorProducts, ...wallProducts] : systemProducts
       const pigmentProduct = allProds.find(sp => sp.product?.name?.toLowerCase().includes('pigment'))?.product
       const pigmentPrice = pigmentProduct?.price || settings.pigment_price
-      const colourName = useCustomColour ? (customColourName || 'Custom') : selectedColour.name
       items.push({
-        name: `Pigment - ${colourName}`,
+        name: `Pigment - ${activeColourName}`,
         qty: `${totalPigmentPacks} pot${totalPigmentPacks > 1 ? 's' : ''}`,
         units: totalPigmentPacks,
         unitSize: 'pot',
@@ -927,7 +908,7 @@ export function Calculator() {
   // Copy list
   function copyList() {
     let text = `MAGMA CALCULATOR - ${selectedSystem?.name || 'Quote'}\n`
-    text += `${totalArea}m² - ${selectedColour.name}\n`
+    text += `${totalArea}m² - ${activeColourName}\n`
     text += '================================\n\n'
     
     items.forEach(item => {
@@ -1336,7 +1317,11 @@ export function Calculator() {
                   {availableSystems.map(system => (
                     <button
                       key={system.id}
-                      onClick={() => handleSystemChange(system.id)}
+                      onClick={() => {
+                        if (surface === 'floor') setFloorSystemId(system.id)
+                        else if (surface === 'wall') setWallSystemId(system.id)
+                        handleSystemChange(system.id)
+                      }}
                       className={`flex-1 py-2.5 px-4 rounded-md font-medium text-sm transition-all min-h-[44px] ${
                         selectedSystemId === system.id
                           ? 'bg-bone text-basalt shadow-sm'
@@ -1588,7 +1573,7 @@ export function Calculator() {
                     <span className="font-medium">£{formatCurrency(subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-stone">VAT (20%)</span>
+                    <span className="text-stone">{vatLabel(settings.vat_rate)}</span>
                     <span className="font-medium">£{formatCurrency(vat)}</span>
                   </div>
                   <div className="flex justify-between items-baseline pt-3">
@@ -1674,12 +1659,15 @@ export function Calculator() {
         isOpen={showSaveModal}
         onClose={() => setShowSaveModal(false)}
         surfaceType={surface}
-        floorArea={floorAreaNum}
-        wallArea={wallAreaNum}
+        // Build Your Own has a single area: store it as floor_area so lists show the real figure
+        floorArea={surface === 'custom' ? totalArea : surface === 'wall' ? 0 : floorAreaNum}
+        wallArea={surface === 'custom' || surface === 'floor' ? 0 : wallAreaNum}
         items={quoteItems}
         subtotal={subtotal}
         vat={vat}
         total={total}
+        colourName={activeColourName}
+        colourHex={useCustomColour ? (customColourHex || null) : selectedColour.hex}
       />
     </div>
   )

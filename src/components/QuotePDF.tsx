@@ -1,4 +1,5 @@
 import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer'
+import { areaLabel, quoteVatRate, vatLabel } from '@/lib/formatters'
 
 // Register font (optional - uses default Helvetica if not registered)
 Font.register({
@@ -238,11 +239,7 @@ export function QuotePDF({
     })
   }
 
-  const getAreaDisplay = () => {
-    if (surfaceType === 'floor') return `${floorArea}m²`
-    if (surfaceType === 'wall') return `${wallArea}m²`
-    return `${floorArea}m² floor + ${wallArea}m² wall`
-  }
+  const getAreaDisplay = () => areaLabel(surfaceType, floorArea, wallArea)
 
   const hasSmartCalc = items.some(item => item.product_name.includes('✦'))
   
@@ -346,7 +343,7 @@ export function QuotePDF({
             <Text style={styles.totalValue}>£{formatCurrency(subtotal)}</Text>
           </View>
           <View style={styles.totalsRow}>
-            <Text style={styles.totalLabel}>VAT (20%)</Text>
+            <Text style={styles.totalLabel}>{vatLabel(quoteVatRate(subtotal, vat))}</Text>
             <Text style={styles.totalValue}>£{formatCurrency(vat)}</Text>
           </View>
           <View style={styles.totalsFinal}>
