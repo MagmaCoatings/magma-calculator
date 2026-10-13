@@ -3,13 +3,13 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { MagmaSpinner } from '@/components/brand/MagmaMark'
-import { Bell, Send, Clock, Trash2, Plus, X } from 'lucide-react'
+import { Bell, Send, Clock, Trash2, Plus, X, Smartphone } from 'lucide-react'
 import {
   CATEGORY_LABELS, notificationCta,
   type NotificationCategory, type NotificationKind, type NotificationLinkType,
 } from '@/lib/notifications'
 
-type Tab = 'send' | 'auto' | 'history'
+type Tab = 'send' | 'auto' | 'history' | 'people'
 type LinkChoice = 'calc' | 'system' | 'quotes' | 'instagram' | 'url'
 
 interface SystemRow { id: string; name: string; surface_type: string; family: string | null }
@@ -29,6 +29,23 @@ interface HistoryRow {
   id: string; title: string; body: string; category: NotificationCategory; kind: NotificationKind
   audience: 'all' | 'selected'; audience_user_ids: string[]; status: 'scheduled' | 'sent' | 'cancelled'
   send_at: string; sent_at: string | null; recipient_count: number
+}
+
+interface AlertPerson {
+  id: string; name: string; company: string; email: string
+  devices: { label: string; since: string }[]
+  off: string[] // categories they've switched off
+}
+
+// Rough device name from the browser's description
+function deviceLabel(ua: string | null): string {
+  const u = ua || ''
+  if (/iPhone/.test(u)) return 'iPhone'
+  if (/iPad/.test(u)) return 'iPad'
+  if (/Android/.test(u)) return 'Android'
+  if (/Macintosh|Mac OS X/.test(u)) return 'Mac'
+  if (/Windows/.test(u)) return 'Windows PC'
+  return 'Device'
 }
 
 const KIND_LABELS: Record<NotificationKind, string> = {
@@ -114,7 +131,33 @@ export function NotificationsAdminPage() {
     loadSettings()
   }, [])
 
-  useEffect(() => { if (tab === 'history') loadHistory() }, [tab])
+  useEffect(() => { if (tab === 'history') loadHistory(); if (tab === 'people') loadAlertPeople() }, [tab])
+
+  // ---- Who has phone alerts on
+  const [alertPeople, setAlertPeople] = useState<AlertPerson[] | null>(null)
+  async function loadAlertPeople() {
+    setAlertPeople(null)
+    const [{ data: profs }, { data: subs }] = await Promise.all([
+      supabase.from('profiles').select('id, email, full_name, first_name, last_name, company_name, status, notify_prefs'),
+      supabase.from('push_subscriptions').select('user_id, user_agent, created_at').order('created_at', { ascending: false }),
+    ])
+    type P = { id: string; email: string | null; full_name: string | null; first_name: string | null; last_name: string | null; company_name: string | null; status: string | null; notify_prefs: Record<string, boolean> | null }
+    type S = { user_id: string; user_agent: string | null; created_at: string }
+    const byUser = new Map<string, S[]>()
+    for (const sub of (subs as S[]) || []) byUser.set(sub.user_id, [...(byUser.get(sub.user_id) || []), sub])
+    const rows = ((profs as P[]) || [])
+      .filter(p => (p.status || 'active') === 'active')
+      .map(p => ({
+        id: p.id,
+        name: p.full_name || [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email || 'Unnamed',
+        company: p.company_name || '',
+        email: p.email || '',
+        devices: (byUser.get(p.id) || []).map(sub => ({ label: deviceLabel(sub.user_agent), since: sub.created_at })),
+        off: (['products', 'quotes', 'social'] as NotificationCategory[]).filter(c => p.notify_prefs?.[c] === false).map(c => CATEGORY_LABELS[c]),
+      }))
+      .sort((a, b) => Number(b.devices.length > 0) - Number(a.devices.length > 0) || a.company.localeCompare(b.company) || a.name.localeCompare(b.name))
+    setAlertPeople(rows)
+  }
 
   function flash(msg: string) {
     setToast(msg)
@@ -264,7 +307,7 @@ export function NotificationsAdminPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-medium text-basalt flex items-center gap-2"><Bell className="w-6 h-6" /> Notifications</h1>
         <div className="bg-track rounded-lg p-1 flex gap-1" role="tablist">
-          {([['send', 'Send'], ['auto', 'Automatic'], ['history', 'History']] as [Tab, string][]).map(([id, label]) => (
+          {([['send', 'Send'], ['auto', 'Automatic'], ['history', 'History'], ['people', 'Who has alerts']] as [Tab, string][]).map(([id, label]) => (
             <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
               className={`min-h-[40px] px-4 rounded-md text-sm font-medium ${tab === id ? 'bg-bone text-basalt shadow-sm' : 'text-stone hover:text-ink'}`}>
               {label}
@@ -529,6 +572,56 @@ export function NotificationsAdminPage() {
                 })}
               </tbody>
             </table>
+          )}
+        </div>
+      )}
+
+      {tab === 'people' && (
+        <div className="bg-bone border border-line rounded-xl overflow-x-auto">
+          {alertPeople === null ? <div className="flex justify-center py-12"><MagmaSpinner size={40} /></div> : (
+            <>
+              <div className="px-5 py-4 border-b border-line-soft">
+                <p className="font-medium text-basalt">
+                  {alertPeople.filter(p => p.devices.length > 0).length} of {alertPeople.length} people have phone alerts on
+                </p>
+                <p className="text-sm text-stone mt-0.5">
+                  Everyone else still sees messages under the bell in Magma. People who tapped “Not now” or blocked alerts show as not on.
+                </p>
+              </div>
+              <table className="w-full text-sm min-w-[640px]">
+                <thead>
+                  <tr className="text-left text-xs text-stone uppercase tracking-wide">
+                    <th className="px-5 py-3 font-medium">Name</th>
+                    <th className="px-3 py-3 font-medium">Phone alerts</th>
+                    <th className="px-5 py-3 font-medium">Switched off</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {alertPeople.map(p => (
+                    <tr key={p.id} className="border-t border-line-soft align-top">
+                      <td className="px-5 py-3">
+                        <p className="font-medium text-basalt">{p.name}</p>
+                        <p className="text-stone">{[p.company, p.email].filter(Boolean).join(' · ')}</p>
+                      </td>
+                      <td className="px-3 py-3">
+                        {p.devices.length === 0 ? <span className="text-stone">Not on</span> : (
+                          <ul className="space-y-1">
+                            {p.devices.map((d, i) => (
+                              <li key={i} className="flex items-center gap-1.5 text-ink">
+                                <Smartphone className="w-4 h-4 text-sage" aria-hidden="true" />
+                                <span>{d.label}</span>
+                                <span className="text-stone">since {new Date(d.since).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </td>
+                      <td className="px-5 py-3 text-ink">{p.off.length ? p.off.join(', ') : <span className="text-stone">Nothing</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           )}
         </div>
       )}

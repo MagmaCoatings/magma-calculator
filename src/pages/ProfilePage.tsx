@@ -8,6 +8,7 @@ import { Save, User, Building, MapPin, Phone, Globe, Check, Bell } from 'lucide-
 import { DEFAULT_NOTIFY_PREFS, type NotifyPrefs } from '@/lib/notifications'
 import { enablePush, disablePush } from '@/lib/push'
 import { usePushState, IosInstallSteps } from '@/components/notifications/PushPrompt'
+import { ChangePasswordCard } from '@/components/ChangePasswordCard'
 
 interface ProfileFormData {
   first_name: string
@@ -471,6 +472,9 @@ export function ProfilePage() {
             )}
           </Button>
         </div>
+
+        {/* Password (separate from Save Changes above) */}
+        <ChangePasswordCard />
       </div>
     </div>
   )
