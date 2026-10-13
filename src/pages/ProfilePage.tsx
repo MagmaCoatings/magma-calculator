@@ -4,7 +4,8 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Save, User, Building, MapPin, Phone, Globe, Check } from 'lucide-react'
+import { Save, User, Building, MapPin, Phone, Globe, Check, Bell } from 'lucide-react'
+import { DEFAULT_NOTIFY_PREFS, type NotifyPrefs } from '@/lib/notifications'
 
 interface ProfileFormData {
   first_name: string
@@ -45,6 +46,9 @@ export function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Notification choices save as soon as they're switched (no Save button needed)
+  const [prefs, setPrefs] = useState<NotifyPrefs>(DEFAULT_NOTIFY_PREFS)
+  const [prefsError, setPrefsError] = useState<string | null>(null)
 
   useEffect(() => {
     if (profile) {
@@ -80,6 +84,7 @@ export function ProfilePage() {
         website_url: data.website_url || '',
         show_tooltips: data.show_tooltips ?? true
       })
+      setPrefs({ ...DEFAULT_NOTIFY_PREFS, ...(data.notify_prefs || {}) })
     }
     setLoading(false)
   }
@@ -89,6 +94,18 @@ export function ProfilePage() {
       .replace(/^@/, '')
       .replace(/^https?:\/\/(www\.)?instagram\.com\//, '')
       .replace(/\/$/, '')
+  }
+
+  async function togglePref(key: keyof NotifyPrefs) {
+    if (!user) return
+    const next = { ...prefs, [key]: !prefs[key] }
+    setPrefs(next)
+    setPrefsError(null)
+    const { error } = await supabase.from('profiles').update({ notify_prefs: next }).eq('id', user.id)
+    if (error) {
+      setPrefs(prefs)
+      setPrefsError('Could not save that change. Please try again.')
+    }
   }
 
   function handleChange(field: keyof ProfileFormData, value: string | boolean) {
@@ -347,6 +364,37 @@ export function ProfilePage() {
               <p className="text-xs text-stone">Display helpful info icons next to products in the calculator</p>
             </div>
           </label>
+        </Card>
+
+        {/* Notifications */}
+        <Card className="p-6">
+          <h2 className="font-medium text-basalt mb-1 flex items-center gap-2"><Bell className="w-4 h-4" /> Notifications</h2>
+          <p className="text-xs text-stone mb-4">Choose what Magma sends you. Changes save straight away.</p>
+          <div className="divide-y divide-line-soft">
+            {([
+              ['products', 'Prices & products', 'Price changes, new products and systems'],
+              ['quotes', 'Quote reminders', 'A nudge when a saved quote hasn\u2019t been ordered after a week'],
+              ['social', 'News & social', 'Instagram, tips and offers'],
+            ] as [keyof NotifyPrefs, string, string][]).map(([key, label, note]) => (
+              <div key={key} className="flex items-center justify-between gap-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-basalt">{label}</p>
+                  <p className="text-xs text-stone">{note}</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={prefs[key]}
+                  aria-label={label}
+                  onClick={() => togglePref(key)}
+                  className={`w-12 h-7 shrink-0 rounded-full relative transition-colors ${prefs[key] ? 'bg-sage' : 'bg-ash'}`}
+                >
+                  <span className={`absolute top-1 w-5 h-5 rounded-full bg-bone shadow transition-transform ${prefs[key] ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+            ))}
+          </div>
+          {prefsError && <p className="text-sm text-danger mt-2">{prefsError}</p>}
         </Card>
 
         {/* Save */}

@@ -11,7 +11,8 @@ import {
   LogOut,
   Calculator,
   Activity,
-  LogIn
+  LogIn,
+  Bell
 } from 'lucide-react'
 
 interface AdminLayoutProps {
@@ -24,6 +25,7 @@ const navItems = [
   { path: '/admin/systems', label: 'Systems', icon: Layers },
   { path: '/admin/stages', label: 'Stages', icon: FileText },
   { path: '/admin/users', label: 'Users', icon: Users },
+  { path: '/admin/notifications', label: 'Notifications', icon: Bell },
   { path: '/admin/logs', label: 'Login Logs', icon: LogIn },
   { path: '/admin/activity', label: 'Activity Log', icon: Activity },
   { path: '/admin/settings', label: 'Settings', icon: Settings },

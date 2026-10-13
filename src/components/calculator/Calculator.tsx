@@ -277,6 +277,25 @@ export function Calculator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [surface, systems, selectedFamily])
 
+  // Deep link from a notification: /?system=<id> opens the calculator on that system
+  const deepLinkDone = useRef(false)
+  useEffect(() => {
+    if (deepLinkDone.current || systems.length === 0) return
+    deepLinkDone.current = true
+    const params = new URLSearchParams(window.location.search)
+    const id = params.get('system')
+    if (!id) return
+    params.delete('system')
+    window.history.replaceState(null, '', window.location.pathname + (params.toString() ? `?${params}` : ''))
+    const sys = systems.find(x => x.id === id)
+    if (!sys || (sys.surface_type !== 'floor' && sys.surface_type !== 'wall')) return
+    if (sys.family) setSelectedFamily(sys.family)
+    if (sys.surface_type === 'floor') { setFloorSystemId(sys.id); setSurface('floor') }
+    else { setWallSystemId(sys.id); setSurface('wall') }
+    handleSystemChange(sys.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [systems])
+
   // Auto-refresh product data when window regains focus (picks up admin changes)
   // This updates prices/names but preserves user's layer selections
   useEffect(() => {

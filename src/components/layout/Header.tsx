@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { LogOut, Settings, Calculator, FileText, User } from 'lucide-react'
 import { MagmaMark } from '@/components/brand/MagmaMark'
+import { NotificationBell, IncomingNotification } from '@/components/notifications/NotificationBell'
 
 export function Header() {
   const { profile, signOut } = useAuth()
@@ -64,6 +65,8 @@ export function Header() {
 
               <div className="w-px h-6 bg-line mx-2" />
 
+              <NotificationBell />
+
               {/* User menu */}
               <div className="flex items-center gap-2">
                 <div className="text-right">
@@ -81,8 +84,9 @@ export function Header() {
               </div>
             </nav>
 
-            {/* Mobile: just profile/logout icons */}
+            {/* Mobile: notifications, admin and logout icons */}
             <div className="flex lg:hidden items-center gap-1">
+              <NotificationBell />
               {isAdmin && (
                 <Link to="/admin">
                   <Button
@@ -101,6 +105,8 @@ export function Header() {
           </div>
         </div>
       </header>
+
+      <IncomingNotification />
 
       {/* Mobile Bottom Tab Bar */}
       <nav className="fixed bottom-0 left-0 right-0 bg-bone border-t border-line lg:hidden z-40 safe-bottom">
