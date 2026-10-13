@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase, getClientLocation, getDeviceType, getBrowser, getOS } from '@/lib/supabase'
 import type { Profile } from '@/lib/types'
@@ -28,6 +28,8 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  // Which user's profile is loaded, so repeat auth events for the same user don't reload it
+  const loadedProfileFor = useRef<string | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [profileLoading, setProfileLoading] = useState(false)
@@ -112,6 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
       clearTimeout(timeout)
       if (session?.user) {
+        loadedProfileFor.current = session.user.id
         setProfileLoading(true)
         fetchProfile(session.user.id).then(p => {
           setProfile(p)
@@ -131,18 +134,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         setSession(session)
         setUser(session?.user ?? null)
         setLoading(false)
 
+        // A token refresh (roughly hourly) doesn't change who is logged in, so don't
+        // reload the profile: doing so flipped profileLoading and swapped admin pages
+        // for a spinner, losing any unsaved form.
+        if (event === 'TOKEN_REFRESHED') return
+
         if (session?.user) {
+          const userId = session.user.id
+          // Supabase also re-sends SIGNED_IN when the tab regains focus; only reload
+          // the profile for a different user or after the user's details change.
+          if (loadedProfileFor.current === userId && event !== 'USER_UPDATED') return
+          loadedProfileFor.current = userId
           setProfileLoading(true)
-          fetchProfile(session.user.id).then(p => {
-            setProfile(p)
-            setProfileLoading(false)
-          })
+          // Defer the Supabase call out of the auth callback (Supabase guidance: avoids a deadlock)
+          setTimeout(() => {
+            fetchProfile(userId).then(p => {
+              if (loadedProfileFor.current !== userId) return // a different user signed in meanwhile
+              if (!p) loadedProfileFor.current = null // failed: allow the next auth event to retry
+              setProfile(p)
+              setProfileLoading(false)
+            })
+          }, 0)
         } else {
+          loadedProfileFor.current = null
           setProfile(null)
           setProfileLoading(false)
         }

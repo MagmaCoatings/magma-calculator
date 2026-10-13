@@ -32,6 +32,8 @@ export function ProductsPage() {
     is_consumable: false,
     consumable_group: '',
     consumable_min_order: '',
+    natural_colour: '',
+    qty_per_job: '',
   })
   const [showAddForm, setShowAddForm] = useState(false)
   const [newProduct, setNewProduct] = useState({
@@ -92,6 +94,8 @@ export function ProductsPage() {
       is_consumable: !!product.is_consumable,
       consumable_group: product.consumable_group || '',
       consumable_min_order: product.consumable_min_order != null ? String(product.consumable_min_order) : '',
+      natural_colour: product.natural_colour || '',
+      qty_per_job: product.qty_per_job != null ? String(product.qty_per_job) : '',
     })
   }
 
@@ -122,6 +126,8 @@ export function ProductsPage() {
       is_consumable: editForm.is_consumable,
       consumable_group: editForm.is_consumable ? (editForm.consumable_group.trim() || null) : null,
       consumable_min_order: editForm.is_consumable ? intNum(editForm.consumable_min_order) : null,
+      natural_colour: editForm.is_consumable ? null : (editForm.natural_colour.trim() || null),
+      qty_per_job: editForm.is_consumable ? null : intNum(editForm.qty_per_job),
     }
 
     const { error } = await supabase
@@ -682,6 +688,20 @@ export function ProductsPage() {
                                 <Input className="w-full" placeholder="e.g. 1kg/m² = 20m² per 20kg pack"
                                   value={editForm.coverage_note}
                                   onChange={e => setEditForm({ ...editForm, coverage_note: e.target.value })} />
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-4">
+                                <div>
+                                  <label className="block text-xs text-stone mb-1">Fixed packs per job <span className="text-ash">(optional, ignores area)</span></label>
+                                  <Input type="number" className="w-40" placeholder="e.g. 1"
+                                    value={editForm.qty_per_job}
+                                    onChange={e => setEditForm({ ...editForm, qty_per_job: e.target.value })} />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-stone mb-1">Natural shade <span className="text-ash">(no pigment needed for this colour)</span></label>
+                                  <Input className="w-56" placeholder="e.g. Nectar 1"
+                                    value={editForm.natural_colour}
+                                    onChange={e => setEditForm({ ...editForm, natural_colour: e.target.value })} />
+                                </div>
                               </div>
                             </div>
                           ) : (

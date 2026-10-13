@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useColours } from '@/hooks/useProducts'
 import { useSettings } from '@/hooks/useSettings'
 import { useAuth } from '@/hooks/useAuth'
-import { formatCurrency } from '@/lib/formatters'
+import { formatCurrency, vatLabel, surfaceLabel, areaLabel } from '@/lib/formatters'
 import { Button } from '@/components/ui/button'
 import { InfoTip } from '@/components/ui/InfoTip'
-import { Copy, Check, ChevronUp, ChevronDown, Package } from 'lucide-react'
+import { Copy, Check, ChevronUp, ChevronDown, Package, Mail, X } from 'lucide-react'
+import { openOrderEmail } from '@/lib/orderEmail'
 import { SaveQuoteModal } from '@/components/SaveQuoteModal'
 import { MagmaSpinner } from '@/components/brand/MagmaMark'
 
@@ -54,6 +55,8 @@ interface SystemProduct {
     min_coats?: number | null
     max_coats?: number | null
     coverage_note?: string | null
+    natural_colour?: string | null
+    qty_per_job?: number | null
   }
   stage: {
     id: string
@@ -70,6 +73,24 @@ const effMinCoats = (sp: SystemProduct) => sp.min_coats ?? sp.product?.min_coats
 const effMaxCoats = (sp: SystemProduct) => sp.max_coats ?? sp.product?.max_coats ?? effDefCoats(sp)
 const effNote = (sp: SystemProduct) => sp.coverage_note ?? sp.product?.coverage_note ?? null
 
+// Within a stage, list each dependent layer (e.g. tape needing Liquid Membrane) straight after its parent
+function orderWithDependants<T extends { products: SystemProduct[] }>(layers: T[]): T[] {
+  const depIds = (l: T) => {
+    const sp = l.products[0]
+    return [...(sp?.depends_on_product_id ? [sp.depends_on_product_id] : []), ...(sp?.depends_on_product_ids || [])]
+  }
+  const isDependant = (l: T) => depIds(l).length > 0
+  const out: T[] = []
+  layers.filter(l => !isDependant(l)).forEach(parent => {
+    out.push(parent)
+    layers.filter(l => isDependant(l) && depIds(l).some(id => parent.products.some(p => p.id === id))).forEach(d => {
+      if (!out.includes(d)) out.push(d)
+    })
+  })
+  layers.forEach(l => { if (!out.includes(l)) out.push(l) })
+  return out
+}
+
 interface LayerState {
   enabled: boolean
   selectedProductId: string | null
@@ -80,7 +101,7 @@ interface LayerState {
 export function Calculator() {
   const { coloursByFamily, loading: coloursLoading } = useColours()
   const { settings, loading: settingsLoading } = useSettings()
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
   const showTooltips = profile?.show_tooltips ?? true
   const [systems, setSystems] = useState<System[]>([])
   const [families, setFamilies] = useState<string[]>([])
@@ -116,11 +137,18 @@ export function Calculator() {
   
   // Save quote modal
   const [showSaveModal, setShowSaveModal] = useState(false)
+  // After copying or emailing an unsaved quote, offer to save it
+  const [offerSave, setOfferSave] = useState<null | 'copied' | 'emailed'>(null)
 
   // Consumables (universal, admin-managed extras)
   const [consumables, setConsumables] = useState<{ id: string; name: string; code: string; price: number; pack_size: number; pack_unit: string; consumable_group: string | null; consumable_min_order: number | null }[]>([])
   const [consumableQtys, setConsumableQtys] = useState<{ [id: string]: number }>({})
   const [showConsumables, setShowConsumables] = useState(false)
+
+  // Layout: folding stage sections, system picker sheet, Floor/Wall switch in Floor + Wall mode
+  const [openStages, setOpenStages] = useState<{ [key: string]: boolean }>({})
+  const [showSystemPicker, setShowSystemPicker] = useState(false)
+  const [editSurface, setEditSurface] = useState<'floor' | 'wall'>('floor')
 
   // Layer states - keyed by stage name or option_group (prefixed with floor_/wall_ in both mode)
   const [layerStates, setLayerStates] = useState<{ [key: string]: LayerState }>({})
@@ -182,25 +210,10 @@ export function Calculator() {
       const uniqueFamilies = [...new Set(regularSystems.map(s => s.family).filter(Boolean))] as string[]
       setFamilies(uniqueFamilies)
 
-      // Auto-select first family if there are multiple
+      // Auto-select first family if there are multiple.
+      // The surface effect below picks and loads the floor/wall systems for it.
       const initialFamily = uniqueFamilies.length > 0 ? uniqueFamilies[0] : null
       setSelectedFamily(initialFamily)
-
-      // Filter by initial family
-      const familySystems = initialFamily
-        ? regularSystems.filter(s => s.family === initialFamily)
-        : regularSystems
-      
-      // Auto-select first floor and wall systems from filtered list
-      const floorSystem = familySystems.find(s => s.surface_type === 'floor')
-      const wallSystem = familySystems.find(s => s.surface_type === 'wall')
-      if (floorSystem) {
-        setFloorSystemId(floorSystem.id)
-        handleSystemChange(floorSystem.id)
-      }
-      if (wallSystem) {
-        setWallSystemId(wallSystem.id)
-      }
     } catch {
       setError('Failed to load systems. Please check your connection and try again.')
     } finally {
@@ -227,27 +240,48 @@ export function Calculator() {
     }
   }, [settingsLoading, settings, settingsApplied])
 
-  // Auto-select appropriate system when surface type changes
+  // Load sequencing: every load records a sequence number, and results from a load
+  // that has since been superseded (user switched surface/system again) are discarded.
+  // modeSeq covers whole-mode loads; sideSeq covers the floor/wall halves of Floor + Wall.
+  const modeSeq = useRef(0)
+  const sideSeq = useRef({ floor: 0, wall: 0 })
+
+  // (Re)load systems whenever the surface or family changes. Layer states are always
+  // rebuilt for the new mode, so floor_/wall_ keys never leak into single-surface mode.
   useEffect(() => {
-    if (systems.length === 0) return
-    
-    let targetSystem: System | undefined
-    
-    if (surface === 'floor' || surface === 'both') {
-      targetSystem = systems.find(s => s.surface_type === 'floor')
-    } else if (surface === 'wall') {
-      targetSystem = systems.find(s => s.surface_type === 'wall')
+    if (systems.length === 0 || surface === 'custom') return
+
+    const familySystems = systems.filter(s => !selectedFamily || s.family === selectedFamily)
+    // Keep the user's current build type for a surface if it belongs to this family
+    const pick = (type: 'floor' | 'wall', currentId: string | null) =>
+      familySystems.find(s => s.id === currentId && s.surface_type === type) ??
+      familySystems.find(s => s.surface_type === type)
+    const floorSys = pick('floor', floorSystemId)
+    const wallSys = pick('wall', wallSystemId)
+    if ((floorSys?.id ?? null) !== floorSystemId) setFloorSystemId(floorSys?.id ?? null)
+    if ((wallSys?.id ?? null) !== wallSystemId) setWallSystemId(wallSys?.id ?? null)
+
+    if (surface === 'both') {
+      loadBothSurfaces(floorSys?.id ?? null, wallSys?.id ?? null)
+    } else {
+      const target = surface === 'floor' ? floorSys : wallSys
+      if (target) {
+        handleSystemChange(target.id)
+      } else {
+        modeSeq.current++
+        setSelectedSystemId(null)
+        setSystemProducts([])
+        setLayerStates({})
+      }
     }
-    
-    if (targetSystem && targetSystem.id !== selectedSystemId) {
-      handleSystemChange(targetSystem.id)
-    }
-  }, [surface, systems])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [surface, systems, selectedFamily])
 
   // Auto-refresh product data when window regains focus (picks up admin changes)
   // This updates prices/names but preserves user's layer selections
   useEffect(() => {
     async function onFocus() {
+      const seq = modeSeq.current // ignore if the user switches mode while this refresh is in flight
       const query = (systemId: string) => supabase
         .from('system_products')
         .select('*, product:products(*), stage:stages(*)')
@@ -258,16 +292,16 @@ export function Calculator() {
         // Refresh both floor and wall products
         if (floorSystemId) {
           const { data } = await query(floorSystemId)
-          if (data) setFloorProducts(data)
+          if (data && seq === modeSeq.current) setFloorProducts(data)
         }
         if (wallSystemId) {
           const { data } = await query(wallSystemId)
-          if (data) setWallProducts(data)
+          if (data && seq === modeSeq.current) setWallProducts(data)
         }
       } else if (selectedSystemId) {
         // Single surface mode
         const { data } = await query(selectedSystemId)
-        if (data) setSystemProducts(data)
+        if (data && seq === modeSeq.current) setSystemProducts(data)
       }
       // Note: NOT calling initLayerStates - preserves user selections
     }
@@ -275,87 +309,79 @@ export function Calculator() {
     return () => window.removeEventListener('focus', onFocus)
   }, [surface, selectedSystemId, floorSystemId, wallSystemId])
 
-  // Load system products when system changes (for single surface mode)
-  async function handleSystemChange(systemId: string) {
-    setSelectedSystemId(systemId)
-    
-    try {
-      const { data } = await supabase
-        .from('system_products')
-        .select('*, product:products(*), stage:stages(*)')
-        .eq('system_id', systemId)
-        .order('display_order')
-
-      if (data) {
-        setSystemProducts(data)
-        
-        // Initialize layer states from defaults
-        initLayerStates(data, '')
-      }
-    } catch {
-      // Silently fail - products will be empty, user can retry via system selection
-      console.error('Failed to load system products')
+  async function fetchSystemProducts(systemId: string): Promise<SystemProduct[] | null> {
+    const { data, error: queryError } = await supabase
+      .from('system_products')
+      .select('*, product:products(*), stage:stages(*)')
+      .eq('system_id', systemId)
+      .order('display_order')
+    if (queryError) {
+      console.error('Failed to load system products', queryError)
+      return null
     }
+    return (data as SystemProduct[]) || []
   }
 
-  // Handle family change - reset system selections
+  // Load system products for single surface mode (Floor or Wall)
+  async function handleSystemChange(systemId: string) {
+    const seq = ++modeSeq.current
+    setSelectedSystemId(systemId)
+    // Clear straight away so no previous mode's layers are counted while loading (or if it fails)
+    setSystemProducts([])
+    setLayerStates({})
+    const data = await fetchSystemProducts(systemId)
+    if (!data || seq !== modeSeq.current) return
+    setSystemProducts(data)
+    setLayerStates(buildLayerStates(data, ''))
+  }
+
+  // Handle family change - the surface effect reloads systems for the new family
   function handleFamilyChange(family: string) {
     setSelectedFamily(family)
-    
-    // Clear current selections
-    setSelectedSystemId(null)
     setFloorSystemId(null)
     setWallSystemId(null)
-    setSystemProducts([])
-    setFloorProducts([])
-    setWallProducts([])
+  }
+
+  // Load both surfaces together when entering Floor + Wall mode
+  async function loadBothSurfaces(floorId: string | null, wallId: string | null) {
+    const seq = ++modeSeq.current
+    const fSeq = ++sideSeq.current.floor
+    const wSeq = ++sideSeq.current.wall
     setLayerStates({})
-    
-    // Auto-select first systems from the new family
-    const familySystems = systems.filter(s => s.family === family)
-    const floorSystem = familySystems.find(s => s.surface_type === 'floor')
-    const wallSystem = familySystems.find(s => s.surface_type === 'wall')
-    
-    if (floorSystem) {
-      setFloorSystemId(floorSystem.id)
-      if (surface === 'floor' || surface === 'both') {
-        handleSystemChange(floorSystem.id)
-      }
+    const [f, w] = await Promise.all([
+      floorId ? fetchSystemProducts(floorId) : Promise.resolve([] as SystemProduct[]),
+      wallId ? fetchSystemProducts(wallId) : Promise.resolve([] as SystemProduct[]),
+    ])
+    if (seq !== modeSeq.current) return
+    const next: { [key: string]: LayerState } = {}
+    if (f && fSeq === sideSeq.current.floor) {
+      setFloorProducts(f)
+      Object.assign(next, buildLayerStates(f, 'floor_'))
     }
-    if (wallSystem) {
-      setWallSystemId(wallSystem.id)
-      if (surface === 'both') {
-        loadSurfaceProducts(wallSystem.id, 'wall')
-      }
+    if (w && wSeq === sideSeq.current.wall) {
+      setWallProducts(w)
+      Object.assign(next, buildLayerStates(w, 'wall_'))
     }
+    setLayerStates(prev => ({ ...prev, ...next }))
   }
 
-  // Load products for a specific surface in "both" mode
+  // Reload one half of Floor + Wall mode (user changed that surface's build type)
   async function loadSurfaceProducts(systemId: string, surfaceType: 'floor' | 'wall') {
-    try {
-      const { data } = await supabase
-        .from('system_products')
-        .select('*, product:products(*), stage:stages(*)')
-        .eq('system_id', systemId)
-        .order('display_order')
-
-      if (data) {
-        if (surfaceType === 'floor') {
-          setFloorProducts(data)
-          initLayerStates(data, 'floor_', true)
-        } else {
-          setWallProducts(data)
-          initLayerStates(data, 'wall_', true)
-        }
-      }
-    } catch {
-      // Silently fail - products will be empty, user can retry via system selection
-      console.error('Failed to load surface products')
-    }
+    const prefix = `${surfaceType}_`
+    const seq = modeSeq.current
+    const sSeq = ++sideSeq.current[surfaceType]
+    const data = await fetchSystemProducts(systemId)
+    if (!data || seq !== modeSeq.current || sSeq !== sideSeq.current[surfaceType]) return
+    if (surfaceType === 'floor') setFloorProducts(data)
+    else setWallProducts(data)
+    setLayerStates(prev => {
+      const kept = Object.fromEntries(Object.entries(prev).filter(([k]) => !k.startsWith(prefix)))
+      return { ...kept, ...buildLayerStates(data, prefix) }
+    })
   }
 
-  // Initialize layer states with optional prefix and merge mode
-  function initLayerStates(data: SystemProduct[], prefix: string, merge = false) {
+  // Build default layer states for a system's products, keys prefixed per surface
+  function buildLayerStates(data: SystemProduct[], prefix: string) {
     const newStates: { [key: string]: LayerState } = {}
     
     data.forEach(sp => {
@@ -379,11 +405,7 @@ export function Calculator() {
       }
     })
     
-    if (merge) {
-      setLayerStates(prev => ({ ...prev, ...newStates }))
-    } else {
-      setLayerStates(newStates)
-    }
+    return newStates
   }
 
   // Handle floor/wall system change in "both" mode
@@ -397,16 +419,6 @@ export function Calculator() {
     loadSurfaceProducts(systemId, 'wall')
   }
 
-  // Load both systems when switching to "both" mode
-  useEffect(() => {
-    if (surface === 'both' && floorSystemId && wallSystemId) {
-      // Clear existing state and load both
-      setLayerStates({})
-      loadSurfaceProducts(floorSystemId, 'floor')
-      loadSurfaceProducts(wallSystemId, 'wall')
-    }
-  }, [surface])
-
   function toggleLayer(key: string) {
     setLayerStates(prev => ({
       ...prev,
@@ -416,7 +428,8 @@ export function Calculator() {
 
   function selectProduct(key: string, productId: string) {
     // Find the system product to get its pigment_default_on value
-    const sp = systemProducts.find(p => p.product_id === productId)
+    const pool = key.startsWith('floor_') ? floorProducts : key.startsWith('wall_') ? wallProducts : systemProducts
+    const sp = pool.find(p => p.product_id === productId)
     const pigmentDefault = sp?.has_pigment ? (sp.pigment_default_on !== false) : false
     
     setLayerStates(prev => ({
@@ -471,10 +484,27 @@ export function Calculator() {
       layer.products.push(sp)
     })
     
+    Object.values(stages).forEach(st => { st.layers = orderWithDependants(st.layers) })
+
     // Sort stages by display_order
     return Object.entries(stages)
       .sort(([, a], [, b]) => a.stageOrder - b.stageOrder)
   }
+
+  // The colour actually in use: a custom colour replaces the swatch entirely
+  const activeColourName = useCustomColour ? (customColourName.trim() || 'Custom') : selectedColour.name
+  const activeColourIsNatural = useCustomColour
+    ? customColourName.toLowerCase().includes('natural')
+    : selectedColour.name.toLowerCase().includes('natural')
+
+  // Is the chosen swatch this product's own unpigmented shade? (e.g. Nectar 1 on Magma 500 Medium)
+  const isNaturalShadeFor = (product?: { natural_colour?: string | null } | null) =>
+    !useCustomColour && !!product?.natural_colour &&
+    product.natural_colour.trim().toLowerCase() === selectedColour.name.trim().toLowerCase()
+
+  // Fixed per-job quantity (e.g. 1 roll of tape), when the product has one
+  const perJobQty = (product?: { qty_per_job?: number | null } | null) =>
+    product?.qty_per_job && product.qty_per_job > 0 ? product.qty_per_job : null
 
   // Calculate materials
   function calculate() {
@@ -549,10 +579,11 @@ export function Calculator() {
           : stdCoverage
         const appSuffix = isDual ? (application === 'mesh' ? ' · over mesh' : ' · standard') : ''
         // An enabled product always shows at least 1 pack — never vanishes while editing the area
-        const units = Math.max(1, Math.ceil((areaWithWastage * coats) / coverage))
+        const fixedQty = perJobQty(sp.product)
+        const units = fixedQty ?? Math.max(1, Math.ceil((areaWithWastage * coats) / coverage))
         items.push({
           name: sp.product.name,
-          qty: (coats > 1 ? `${areaWithWastage.toFixed(1)}m² × ${coats} coats` : `${areaWithWastage.toFixed(1)}m²`) + appSuffix,
+          qty: fixedQty ? `${fixedQty} per job` : (coats > 1 ? `${areaWithWastage.toFixed(1)}m² × ${coats} coats` : `${areaWithWastage.toFixed(1)}m²`) + appSuffix,
           units,
           unitSize: sp.product.pack_size === 1 ? sp.product.pack_unit : `${sp.product.pack_size}${sp.product.pack_unit}`,
           cost: units * sp.product.price,
@@ -560,12 +591,10 @@ export function Calculator() {
           productOrder: sp.display_order ?? 0,
           surfaceType: 1,
         })
-        if (st.pigment && sp.has_pigment) pigPacks += units
+        if (st.pigment && sp.has_pigment && !isNaturalShadeFor(sp.product)) pigPacks += units
       }
-      const isNatural = selectedColour.name.toLowerCase().includes('natural') || (useCustomColour && customColourName.toLowerCase().includes('natural'))
-      if (pigPacks > 0 && !isNatural) {
-        const colourName = useCustomColour ? (customColourName || 'Custom') : selectedColour.name
-        items.push({ name: `Pigment - ${colourName}`, qty: `${pigPacks} pot${pigPacks > 1 ? 's' : ''}`, units: pigPacks, unitSize: 'pot', cost: pigPacks * settings.pigment_price, stageOrder: 999, productOrder: 0, surfaceType: 3 })
+      if (pigPacks > 0 && !activeColourIsNatural) {
+        items.push({ name: `Pigment - ${activeColourName}`, qty: `${pigPacks} pot${pigPacks > 1 ? 's' : ''}`, units: pigPacks, unitSize: 'pot', cost: pigPacks * settings.pigment_price, stageOrder: 999, productOrder: 0, surfaceType: 3 })
       }
       items.sort((a, b) => a.stageOrder - b.stageOrder || a.productOrder - b.productOrder)
       const subtotal = items.reduce((s, i) => s + i.cost, 0)
@@ -620,7 +649,8 @@ export function Calculator() {
         const coats = state.coats || 1
         const coverage = effCoverage(sp)
         const areaWithCoats = area * coats
-        const unitsNeeded = Math.ceil(areaWithCoats / coverage)
+        const fixedQty = perJobQty(sp.product)
+        const unitsNeeded = fixedQty ?? Math.ceil(areaWithCoats / coverage)
 
         // Shared products don't get F/W prefix, but get a badge
         const isSharedInBothMode = surface === 'both' && sp.shared_across_surfaces
@@ -630,7 +660,9 @@ export function Calculator() {
 
         // For shared products in both mode, make it very clear it covers both areas
         let qtyDisplay: string
-        if (isSharedInBothMode) {
+        if (fixedQty) {
+          qtyDisplay = `${fixedQty} per job`
+        } else if (isSharedInBothMode) {
           qtyDisplay = coats > 1 
             ? `${area.toFixed(1)}m² total (floor + wall combined) × ${coats} coats` 
             : `${area.toFixed(1)}m² total (floor + wall combined)`
@@ -651,7 +683,7 @@ export function Calculator() {
           surfaceType: isSharedPass ? 0 : (prefix === 'floor_' ? 1 : 2), // 0=shared, 1=floor, 2=wall
         })
 
-        if (state.pigment && sp.has_pigment) {
+        if (state.pigment && sp.has_pigment && !isNaturalShadeFor(sp.product)) {
           totalPigmentPacks += unitsNeeded
         }
       })
@@ -672,16 +704,12 @@ export function Calculator() {
 
     // Add pigment pots (1 per pack of pigmented product)
     // Skip if "Natural" colour is selected (no pigment needed)
-    const isNaturalColour = selectedColour.name.toLowerCase().includes('natural') || 
-                            (useCustomColour && customColourName.toLowerCase().includes('natural'))
-    
-    if (totalPigmentPacks > 0 && !isNaturalColour) {
+    if (totalPigmentPacks > 0 && !activeColourIsNatural) {
       const allProds = surface === 'both' ? [...floorProducts, ...wallProducts] : systemProducts
       const pigmentProduct = allProds.find(sp => sp.product?.name?.toLowerCase().includes('pigment'))?.product
       const pigmentPrice = pigmentProduct?.price || settings.pigment_price
-      const colourName = useCustomColour ? (customColourName || 'Custom') : selectedColour.name
       items.push({
-        name: `Pigment - ${colourName}`,
+        name: `Pigment - ${activeColourName}`,
         qty: `${totalPigmentPacks} pot${totalPigmentPacks > 1 ? 's' : ''}`,
         units: totalPigmentPacks,
         unitSize: 'pot',
@@ -795,9 +823,9 @@ export function Calculator() {
         : null
 
     return (
-      <div key={`${stageName}__${layer.key}`} className={`bg-bone border border-line rounded-xl p-5 ${
-        layer.isOptional && !state.enabled ? 'opacity-60' : ''
-      }`}>
+      <div key={`${stageName}__${layer.key}`} className={`py-4 border-t border-line-soft first:border-t-0 ${
+        dependsOnId ? 'ml-2 pl-4 border-l-2 border-l-track' : ''
+      } ${layer.isOptional && !state.enabled ? 'opacity-60' : ''}`}>
         {/* Layer header */}
         <div className="flex justify-between items-start">
           <div>
@@ -817,7 +845,9 @@ export function Calculator() {
           {layer.isOptional && (
             <button
               onClick={() => toggleLayer(layer.key)}
-              className={`w-12 h-6 rounded-full transition-colors relative ${
+              aria-label={`Include ${selectedProduct?.product?.name || stageName}`}
+              aria-pressed={!!state.enabled}
+              className={`w-12 h-6 shrink-0 rounded-full transition-colors relative ${
                 state.enabled ? 'bg-sage' : 'bg-ash'
               }`}
             >
@@ -902,6 +932,9 @@ export function Calculator() {
                         state.pigment ? 'translate-x-5' : 'translate-x-0.5'
                       }`} />
                     </button>
+                    {state.pigment && isNaturalShadeFor(selectedProduct?.product) && (
+                      <span className="text-xs text-ash">{selectedColour.name} is this product's natural shade, so no pigment is needed</span>
+                    )}
                   </div>
                 )}
               </div>
@@ -912,22 +945,54 @@ export function Calculator() {
     )
   }
 
-  // Render stage groups - returns flat array of layer cards
-  function renderStageGroups(groups: [string, { layers: any[] }][]) {
-    const result: React.ReactNode[] = []
-    groups.forEach(([stageName, { layers }]) => {
-      layers.forEach(layer => {
-        const card = renderLayerCard(layer, stageName)
-        if (card) result.push(card)
-      })
+  // One-line summary of what a stage currently includes
+  function stageSummary(layers: { key: string; products: SystemProduct[]; isOptional: boolean }[]) {
+    const names: string[] = []
+    layers.forEach(layer => {
+      const st = layerStates[layer.key]
+      if (!st?.enabled || !st.selectedProductId) return
+      const sp = layer.products.find(p => p.product_id === st.selectedProductId)
+      if (sp?.product?.name) names.push(sp.product.name)
     })
-    return result
+    return names.length ? names.join(' + ') : 'Not included'
+  }
+
+  // Stages as folding sections: header shows the stage and a summary, tap to open its layers
+  function renderStageSections(groups: [string, { layers: any[] }][], prefix: string) {
+    let n = 0
+    return groups.map(([stageName, { layers }]) => {
+      const cards = layers.map(layer => renderLayerCard(layer, stageName)).filter(Boolean)
+      if (cards.length === 0) return null
+      n += 1
+      const openKey = `${prefix}${stageName}`
+      const open = !!openStages[openKey]
+      return (
+        <div key={openKey} className="bg-bone border border-line rounded-xl overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setOpenStages(prev => ({ ...prev, [openKey]: !open }))}
+            aria-expanded={open}
+            className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left min-h-[60px]"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className={`w-6 h-6 rounded-md text-xs font-medium flex items-center justify-center shrink-0 ${open ? 'bg-basalt text-bone' : 'bg-track text-ink'}`}>{n}</span>
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-basalt">{stageName}</span>
+                <span className="block text-xs text-stone truncate">{stageSummary(layers)}</span>
+              </span>
+            </span>
+            <ChevronDown className={`w-5 h-5 text-stone shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+          </button>
+          {open && <div className="px-5 pb-1 border-t border-line-soft">{cards}</div>}
+        </div>
+      )
+    })
   }
 
   // Copy list
   function copyList() {
     let text = `MAGMA CALCULATOR - ${selectedSystem?.name || 'Quote'}\n`
-    text += `${totalArea}m² - ${selectedColour.name}\n`
+    text += `${totalArea}m² - ${activeColourName}\n`
     text += '================================\n\n'
     
     items.forEach(item => {
@@ -944,6 +1009,32 @@ export function Calculator() {
     navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+    setOfferSave('copied')
+  }
+
+  // Email the order to Magma straight from the calculator, without saving first
+  function emailOrder() {
+    const savedFloor = surface === 'custom' ? totalArea : surface === 'wall' ? 0 : floorAreaNum
+    const savedWall = surface === 'custom' || surface === 'floor' ? 0 : wallAreaNum
+    openOrderEmail({
+      reference: null,
+      surface: surfaceLabel(surface),
+      area: areaLabel(surface, savedFloor, savedWall),
+      colour: activeColourName,
+      items: quoteItems.map(i => ({ quantity: i.quantity, name: i.name, unitPrice: i.unitPrice, total: i.total })),
+      subtotal,
+      vat,
+      total,
+      vatRate: settings.vat_rate,
+      profile,
+      userEmail: user?.email,
+    })
+    setOfferSave('emailed')
+  }
+
+  function openSave() {
+    setOfferSave(null)
+    setShowSaveModal(true)
   }
 
   if (loading || coloursLoading || settingsLoading) {
@@ -1014,6 +1105,7 @@ export function Calculator() {
       layer.products.push(sp)
     })
     stageList.sort((a, b) => a.order - b.order)
+    stageList.forEach(stg => { stg.layers = orderWithDependants(stg.layers) })
 
     return (
       <>
@@ -1044,10 +1136,32 @@ export function Calculator() {
           </div>
         </div>
 
-        {stageList.map(stg => (
-          <div key={stg.name}>
-            <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3 px-1">{stg.name}</p>
-            <div className="space-y-4">
+        {stageList.map((stg, stgIdx) => {
+          const openKey = `custom_${stg.name}`
+          const open = !!openStages[openKey]
+          const included = stg.layers
+            .filter(l => customLayers[l.key]?.enabled && depsOk(l.products[0]))
+            .map(l => (l.products.find(p => p.product_id === customLayers[l.key]?.selectedProductId) || l.products[0])?.product?.name)
+            .filter(Boolean)
+          return (
+          <div key={stg.name} className="bg-bone border border-line rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setOpenStages(prev => ({ ...prev, [openKey]: !open }))}
+              aria-expanded={open}
+              className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left min-h-[60px]"
+            >
+              <span className="flex items-center gap-3 min-w-0">
+                <span className={`w-6 h-6 rounded-md text-xs font-medium flex items-center justify-center shrink-0 ${open ? 'bg-basalt text-bone' : 'bg-track text-ink'}`}>{stgIdx + 1}</span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-basalt">{stg.name}</span>
+                  <span className="block text-xs text-stone truncate">{included.length ? included.join(' + ') : 'None selected'}</span>
+                </span>
+              </span>
+              <ChevronDown className={`w-5 h-5 text-stone shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+            {open && (
+            <div className="px-5 pb-1 border-t border-line-soft">
               {stg.layers.map(layer => {
                 const reps = layer.products
                 if (!depsOk(reps[0])) return null
@@ -1060,7 +1174,7 @@ export function Calculator() {
                 const isDual = selOverMesh != null && selOverMesh !== selStd
                 const effApp: 'mesh' | 'standard' = st.application ?? (meshOn ? 'mesh' : 'standard')
                 return (
-                  <div key={layer.key} className={`bg-bone border border-line rounded-xl p-5 ${!st.enabled ? 'opacity-60' : ''}`}>
+                  <div key={layer.key} className={`py-4 border-t border-line-soft first:border-t-0 ${reps[0].depends_on_product_id || reps[0].depends_on_product_ids?.length ? 'ml-2 pl-4 border-l-2 border-l-track' : ''} ${!st.enabled ? 'opacity-60' : ''}`}>
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="font-medium text-basalt">{reps[0]?.group_label || selected.product?.name}</p>
@@ -1152,6 +1266,9 @@ export function Calculator() {
                               >
                                 <div className={`w-4 h-4 rounded-full bg-white shadow absolute top-0.5 transition-transform ${st.pigment ? 'translate-x-5' : 'translate-x-0.5'}`} />
                               </button>
+                              {st.pigment && isNaturalShadeFor(selected.product) && (
+                                <span className="text-xs text-ash">{selectedColour.name} is this product's natural shade, so no pigment is needed</span>
+                              )}
                             </div>
                           )}
                         </div>
@@ -1161,21 +1278,36 @@ export function Calculator() {
                 )
               })}
             </div>
+            )}
           </div>
-        ))}
+          )
+        })}
       </>
     )
   }
 
-  // Filter systems by surface type and family
-  const availableSystems = systems.filter(s => {
-    // First filter by family
-    if (selectedFamily && s.family !== selectedFamily) return false
-    // Then filter by surface type
-    if (surface === 'floor') return s.surface_type === 'floor' || s.name.toLowerCase().includes('floor')
-    if (surface === 'wall') return s.surface_type === 'wall' || s.name.toLowerCase().includes('wall')
-    return true
-  })
+  // System summary line and picker contents
+  const shortName = (id: string | null) => (systems.find(x => x.id === id)?.name || '').replace(/^(Floor|Wall)\s+/i, '')
+  const systemSummary = surface === 'both'
+    ? `Floor ${shortName(floorSystemId) || '-'} · Wall ${shortName(wallSystemId) || '-'}`
+    : (selectedSystem?.name || 'Choose a system')
+  const pickerSurface: 'floor' | 'wall' = surface === 'both' ? editSurface : (surface === 'wall' ? 'wall' : 'floor')
+  const pickerSystems = systems.filter(s => s.surface_type === pickerSurface && (!selectedFamily || s.family === selectedFamily))
+  const pickerSelectedId = surface === 'both'
+    ? (pickerSurface === 'floor' ? floorSystemId : wallSystemId)
+    : selectedSystemId
+  function pickSystem(id: string) {
+    if (surface === 'both') {
+      if (pickerSurface === 'floor') handleFloorSystemChange(id)
+      else handleWallSystemChange(id)
+      return // stay open so the other surface can be chosen too
+    }
+    if (surface === 'floor') setFloorSystemId(id)
+    else if (surface === 'wall') setWallSystemId(id)
+    handleSystemChange(id)
+    setShowSystemPicker(false)
+  }
+
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 pb-52 lg:pb-6">
@@ -1270,91 +1402,47 @@ export function Calculator() {
           </div>
           )}
 
-          {/* Build type / System — Build Your Own replaces it entirely */}
-          {surface === 'custom' ? renderBuildYourOwn() : surface === 'both' ? (
+          {/* System summary (opens the picker) and layers by stage; Build Your Own replaces both */}
+          {surface === 'custom' ? renderBuildYourOwn() : (
             <>
-              {/* Floor configuration */}
-              <div className="bg-bone border border-line rounded-xl p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded bg-basalt text-white text-xs font-medium flex items-center justify-center">F</div>
-                  <p className="text-sm font-medium text-ink">Floor configuration</p>
-                </div>
-                <p className="text-xs font-medium text-stone uppercase tracking-wide mb-2">Build type</p>
-                <div className="bg-track rounded-lg p-1 flex gap-1 mb-4">
-                  {systems.filter(s => s.surface_type === 'floor' && (!selectedFamily || s.family === selectedFamily)).map(system => (
-                    <button
-                      key={system.id}
-                      onClick={() => handleFloorSystemChange(system.id)}
-                      className={`flex-1 py-2 px-3 rounded-md font-medium text-sm transition-all min-h-[44px] ${
-                        floorSystemId === system.id
-                          ? 'bg-bone text-basalt shadow-sm'
-                          : 'text-stone hover:text-ink'
-                      }`}
-                    >
-                      {system.name.replace('Floor ', '')}
-                    </button>
-                  ))}
-                </div>
-                <div className="space-y-3">
-                  {renderStageGroups(floorStageGroups as [string, { layers: any[] }][])}
-                </div>
+              <div className="bg-bone border border-line rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setShowSystemPicker(true)}
+                  className="w-full flex items-center justify-between gap-3 p-5 text-left min-h-[64px]"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-xs font-medium text-stone uppercase tracking-wide">System</span>
+                    <span className="block font-medium text-basalt mt-1">{systemSummary}</span>
+                  </span>
+                  <span className="text-sm font-medium text-molten-ink shrink-0">Change</span>
+                </button>
               </div>
 
-              {/* Wall configuration */}
-              <div className="bg-bone border border-line rounded-xl p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded bg-basalt text-white text-xs font-medium flex items-center justify-center">W</div>
-                  <p className="text-sm font-medium text-ink">Wall configuration</p>
-                </div>
-                <p className="text-xs font-medium text-stone uppercase tracking-wide mb-2">Build type</p>
-                <div className="bg-track rounded-lg p-1 flex gap-1 mb-4">
-                  {systems.filter(s => s.surface_type === 'wall' && (!selectedFamily || s.family === selectedFamily)).map(system => (
+              {surface === 'both' && (
+                <div className="bg-track rounded-lg p-1 flex gap-1" role="tablist" aria-label="Surface to edit">
+                  {(['floor', 'wall'] as const).map(sf => (
                     <button
-                      key={system.id}
-                      onClick={() => handleWallSystemChange(system.id)}
-                      className={`flex-1 py-2 px-3 rounded-md font-medium text-sm transition-all min-h-[44px] ${
-                        wallSystemId === system.id
-                          ? 'bg-bone text-basalt shadow-sm'
-                          : 'text-stone hover:text-ink'
+                      key={sf}
+                      role="tab"
+                      aria-selected={editSurface === sf}
+                      onClick={() => setEditSurface(sf)}
+                      className={`flex-1 py-2.5 px-3 rounded-md font-medium text-sm transition-all min-h-[44px] ${
+                        editSurface === sf ? 'bg-bone text-basalt shadow-sm' : 'text-stone hover:text-ink'
                       }`}
                     >
-                      {system.name.replace('Wall ', '')}
+                      {sf === 'floor' ? `Floor ${floorAreaNum}m²` : `Wall ${wallAreaNum}m²`}
                     </button>
                   ))}
                 </div>
-                <div className="space-y-3">
-                  {renderStageGroups(wallStageGroups as [string, { layers: any[] }][])}
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Single surface mode */}
-              <div className="bg-bone border border-line rounded-xl p-5">
-                <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3">Build type</p>
-                <div className="bg-track rounded-lg p-1 flex gap-1">
-                  {availableSystems.map(system => (
-                    <button
-                      key={system.id}
-                      onClick={() => handleSystemChange(system.id)}
-                      className={`flex-1 py-2.5 px-4 rounded-md font-medium text-sm transition-all min-h-[44px] ${
-                        selectedSystemId === system.id
-                          ? 'bg-bone text-basalt shadow-sm'
-                          : 'text-stone hover:text-ink'
-                      }`}
-                    >
-                      {system.name.replace('Floor ', '').replace('Wall ', '')}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              )}
 
-              {/* Layers */}
-              <div>
-                <p className="text-xs font-medium text-stone uppercase tracking-wide mb-3 px-1">Layers</p>
-                <div className="space-y-4">
-                  {renderStageGroups(singleStageGroups as [string, { layers: any[] }][])}
-                </div>
+              <div className="space-y-3">
+                {surface === 'both'
+                  ? (editSurface === 'floor'
+                      ? renderStageSections(floorStageGroups as [string, { layers: any[] }][], 'floor_')
+                      : renderStageSections(wallStageGroups as [string, { layers: any[] }][], 'wall_'))
+                  : renderStageSections(singleStageGroups as [string, { layers: any[] }][], `${surface}_single_`)}
               </div>
             </>
           )}
@@ -1543,13 +1631,25 @@ export function Calculator() {
           <div className="bg-bone border border-line rounded-xl p-5 shadow-sm">
             <div className="flex justify-between items-center mb-4">
               <h2 className="font-medium text-basalt">Materials</h2>
-              <button
-                onClick={copyList}
-                className="flex items-center gap-1.5 text-sm text-stone hover:text-molten-ink"
-              >
-                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={emailOrder}
+                  disabled={items.length === 0}
+                  className="flex items-center gap-1.5 text-sm text-stone hover:text-molten-ink disabled:opacity-40"
+                  title="Email this order to Magma (no need to save first)"
+                >
+                  <Mail className="w-4 h-4" />
+                  Email
+                </button>
+                <button
+                  onClick={copyList}
+                  disabled={items.length === 0}
+                  className="flex items-center gap-1.5 text-sm text-stone hover:text-molten-ink disabled:opacity-40"
+                >
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
             </div>
 
             {items.length === 0 ? (
@@ -1588,7 +1688,7 @@ export function Calculator() {
                     <span className="font-medium">£{formatCurrency(subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-stone">VAT (20%)</span>
+                    <span className="text-stone">{vatLabel(settings.vat_rate)}</span>
                     <span className="font-medium">£{formatCurrency(vat)}</span>
                   </div>
                   <div className="flex justify-between items-baseline pt-3">
@@ -1617,7 +1717,7 @@ export function Calculator() {
             className="w-full mt-4 hidden lg:flex" 
             size="lg"
             disabled={items.length === 0}
-            onClick={() => setShowSaveModal(true)}
+            onClick={openSave}
           >
             Save Quote
           </Button>
@@ -1657,9 +1757,19 @@ export function Calculator() {
               {copied ? <Check className="w-4 h-4 text-sage" /> : <Copy className="w-4 h-4" />}
             </Button>
             <Button
+              variant="outline"
+              className="min-h-[48px] px-3 shrink-0"
+              disabled={items.length === 0}
+              onClick={emailOrder}
+              aria-label="Email order to Magma"
+              title="Email order"
+            >
+              <Mail className="w-4 h-4" />
+            </Button>
+            <Button
               className="flex-1 min-h-[48px]"
               disabled={items.length === 0}
-              onClick={() => setShowSaveModal(true)}
+              onClick={openSave}
             >
               Save Quote
             </Button>
@@ -1669,17 +1779,122 @@ export function Calculator() {
 
       <p className="text-center text-xs text-ash mt-8 hidden lg:block">© Magma Coatings Ltd</p>
       
+      {/* System picker sheet */}
+      {showSystemPicker && (
+        <div
+          className="fixed inset-0 z-[70] bg-basalt/50 flex items-end lg:items-center justify-center"
+          onClick={() => setShowSystemPicker(false)}
+          onKeyDown={e => { if (e.key === 'Escape') setShowSystemPicker(false) }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Choose a system"
+            onClick={e => e.stopPropagation()}
+            className="bg-bone w-full lg:max-w-md rounded-t-2xl lg:rounded-2xl max-h-[85vh] overflow-y-auto p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-medium text-basalt">{surface === 'both' ? 'Choose systems' : 'Choose a system'}</h2>
+              <button
+                onClick={() => setShowSystemPicker(false)}
+                aria-label="Close"
+                className="w-11 h-11 flex items-center justify-center rounded-lg text-stone hover:text-basalt"
+                autoFocus
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {surface === 'both' && (
+              <div className="bg-track rounded-lg p-1 flex gap-1">
+                {(['floor', 'wall'] as const).map(sf => (
+                  <button
+                    key={sf}
+                    onClick={() => setEditSurface(sf)}
+                    className={`flex-1 py-2.5 rounded-md font-medium text-sm min-h-[44px] ${
+                      editSurface === sf ? 'bg-bone text-basalt shadow-sm' : 'text-stone hover:text-ink'
+                    }`}
+                  >
+                    {sf === 'floor' ? 'Floor' : 'Wall'}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <p className="text-xs font-medium text-stone uppercase tracking-wide pt-1">{selectedFamily || 'Systems'}</p>
+            {pickerSystems.map(sys => {
+              const sel = pickerSelectedId === sys.id
+              return (
+                <button
+                  key={sys.id}
+                  onClick={() => pickSystem(sys.id)}
+                  aria-pressed={sel}
+                  className={`w-full flex gap-3 p-4 rounded-xl text-left bg-bone ${sel ? 'border-2 border-molten' : 'border border-line hover:border-stone'}`}
+                >
+                  <span className={`w-5 h-5 rounded-full shrink-0 mt-0.5 ${sel ? 'border-[6px] border-molten' : 'border-2 border-ash'}`} />
+                  <span className="min-w-0">
+                    <span className="block font-medium text-basalt">{sys.name}</span>
+                    {sys.description && <span className="block text-sm text-stone mt-1 leading-snug">{sys.description}</span>}
+                  </span>
+                </button>
+              )
+            })}
+
+            <p className="text-xs font-medium text-stone uppercase tracking-wide pt-2">Pick products yourself</p>
+            <button
+              onClick={() => { setSurface('custom'); setShowSystemPicker(false) }}
+              className="w-full flex gap-3 p-4 rounded-xl text-left bg-bone border border-dashed border-ash hover:border-stone"
+            >
+              <span className="w-5 h-5 rounded-full shrink-0 mt-0.5 border-2 border-ash" />
+              <span>
+                <span className="block font-medium text-basalt">Build your own</span>
+                <span className="block text-sm text-stone mt-1 leading-snug">Switch on exactly the products you need, each with its own area</span>
+              </span>
+            </button>
+
+            {surface === 'both' && (
+              <Button className="w-full mt-2" size="lg" onClick={() => setShowSystemPicker(false)}>Done</Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Offer to save after copying or emailing an unsaved quote */}
+      {offerSave && !showSaveModal && items.length > 0 && (
+        <div
+          role="status"
+          className="fixed z-[60] left-4 right-4 bottom-[calc(9.5rem+env(safe-area-inset-bottom))] lg:left-auto lg:right-6 lg:bottom-6 lg:w-96 bg-basalt text-bone rounded-xl shadow-lg p-4 flex items-start gap-3"
+        >
+          <div className="flex-1">
+            <p className="text-sm font-medium">{offerSave === 'copied' ? 'Materials list copied.' : 'Order email opened.'}</p>
+            <p className="text-xs text-bone/80 mt-0.5">This quote isn't saved yet. Save it to find it later in Quotes.</p>
+            <button
+              onClick={openSave}
+              className="mt-3 px-4 py-2 rounded-lg bg-molten text-white text-sm font-medium hover:bg-molten-ink min-h-[40px]"
+            >
+              Save quote
+            </button>
+          </div>
+          <button onClick={() => setOfferSave(null)} aria-label="Dismiss" className="p-1 text-bone/70 hover:text-bone">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Save Quote Modal */}
       <SaveQuoteModal
         isOpen={showSaveModal}
         onClose={() => setShowSaveModal(false)}
         surfaceType={surface}
-        floorArea={floorAreaNum}
-        wallArea={wallAreaNum}
+        // Build Your Own has a single area: store it as floor_area so lists show the real figure
+        floorArea={surface === 'custom' ? totalArea : surface === 'wall' ? 0 : floorAreaNum}
+        wallArea={surface === 'custom' || surface === 'floor' ? 0 : wallAreaNum}
         items={quoteItems}
         subtotal={subtotal}
         vat={vat}
         total={total}
+        colourName={activeColourName}
+        colourHex={useCustomColour ? (customColourHex || null) : selectedColour.hex}
       />
     </div>
   )

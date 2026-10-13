@@ -23,7 +23,11 @@ interface SaveQuoteModalProps {
   subtotal: number
   vat: number
   total: number
+  colourName?: string | null
+  colourHex?: string | null
 }
+
+const pennies = (n: number) => Math.round(n * 100) / 100
 
 export function SaveQuoteModal({
   isOpen,
@@ -35,6 +39,8 @@ export function SaveQuoteModal({
   subtotal,
   vat,
   total,
+  colourName,
+  colourHex,
 }: SaveQuoteModalProps) {
   const navigate = useNavigate()
   const [clientName, setClientName] = useState('')
@@ -76,11 +82,14 @@ export function SaveQuoteModal({
           floor_area: floorArea,
           wall_area: wallArea,
           notes: notes || null,
-          subtotal,
-          vat,
-          total,
+          subtotal: pennies(subtotal),
+          vat: pennies(vat),
+          total: pennies(total),
           status: 'draft',
           created_by: user?.id || null,
+          // Colour used for the quote (swatch or custom); the pigment line also carries it
+          custom_colour_name: colourName || null,
+          custom_colour_hex: colourHex || null,
         })
         .select()
         .single()
@@ -99,8 +108,8 @@ export function SaveQuoteModal({
           product_code: item.code,
           product_name: item.name,
           quantity: item.quantity,
-          unit_price: item.unitPrice,
-          line_total: item.total,
+          unit_price: pennies(item.unitPrice),
+          line_total: pennies(item.total),
           display_order: index,
         }))
 
@@ -109,7 +118,12 @@ export function SaveQuoteModal({
           .insert(quoteItems)
 
         if (itemsError) {
+          // Don't leave a quote with totals but no lines: remove the header and tell the user
           console.error('Error saving items:', itemsError)
+          await supabase.from('quotes').delete().eq('id', quote.id)
+          alert('Error saving quote lines, so the quote was not saved. Please try again.\n\n' + itemsError.message)
+          setSaving(false)
+          return
         }
       }
 
