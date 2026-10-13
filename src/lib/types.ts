@@ -51,6 +51,10 @@ export interface Product {
   // Consumables only (physical extras): family grouping + minimum order qty
   consumable_group?: string | null
   consumable_min_order?: number | null
+  // Colour this product already is without pigment (e.g. Magma 500 Medium = 'Nectar 1')
+  natural_colour?: string | null
+  // Fixed number of packs per job regardless of area (e.g. 1 roll of crack bridging tape)
+  qty_per_job?: number | null
 }
 
 export interface ProductCategory {

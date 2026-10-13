@@ -54,6 +54,8 @@ interface SystemProduct {
     min_coats?: number | null
     max_coats?: number | null
     coverage_note?: string | null
+    natural_colour?: string | null
+    qty_per_job?: number | null
   }
   stage: {
     id: string
@@ -467,6 +469,15 @@ export function Calculator() {
     ? customColourName.toLowerCase().includes('natural')
     : selectedColour.name.toLowerCase().includes('natural')
 
+  // Is the chosen swatch this product's own unpigmented shade? (e.g. Nectar 1 on Magma 500 Medium)
+  const isNaturalShadeFor = (product?: { natural_colour?: string | null } | null) =>
+    !useCustomColour && !!product?.natural_colour &&
+    product.natural_colour.trim().toLowerCase() === selectedColour.name.trim().toLowerCase()
+
+  // Fixed per-job quantity (e.g. 1 roll of tape), when the product has one
+  const perJobQty = (product?: { qty_per_job?: number | null } | null) =>
+    product?.qty_per_job && product.qty_per_job > 0 ? product.qty_per_job : null
+
   // Calculate materials
   function calculate() {
     const items: { name: string; qty: string; units: number; unitSize: string; cost: number; stageOrder: number; productOrder: number; surfaceType: number }[] = []
@@ -540,10 +551,11 @@ export function Calculator() {
           : stdCoverage
         const appSuffix = isDual ? (application === 'mesh' ? ' · over mesh' : ' · standard') : ''
         // An enabled product always shows at least 1 pack — never vanishes while editing the area
-        const units = Math.max(1, Math.ceil((areaWithWastage * coats) / coverage))
+        const fixedQty = perJobQty(sp.product)
+        const units = fixedQty ?? Math.max(1, Math.ceil((areaWithWastage * coats) / coverage))
         items.push({
           name: sp.product.name,
-          qty: (coats > 1 ? `${areaWithWastage.toFixed(1)}m² × ${coats} coats` : `${areaWithWastage.toFixed(1)}m²`) + appSuffix,
+          qty: fixedQty ? `${fixedQty} per job` : (coats > 1 ? `${areaWithWastage.toFixed(1)}m² × ${coats} coats` : `${areaWithWastage.toFixed(1)}m²`) + appSuffix,
           units,
           unitSize: sp.product.pack_size === 1 ? sp.product.pack_unit : `${sp.product.pack_size}${sp.product.pack_unit}`,
           cost: units * sp.product.price,
@@ -551,7 +563,7 @@ export function Calculator() {
           productOrder: sp.display_order ?? 0,
           surfaceType: 1,
         })
-        if (st.pigment && sp.has_pigment) pigPacks += units
+        if (st.pigment && sp.has_pigment && !isNaturalShadeFor(sp.product)) pigPacks += units
       }
       if (pigPacks > 0 && !activeColourIsNatural) {
         items.push({ name: `Pigment - ${activeColourName}`, qty: `${pigPacks} pot${pigPacks > 1 ? 's' : ''}`, units: pigPacks, unitSize: 'pot', cost: pigPacks * settings.pigment_price, stageOrder: 999, productOrder: 0, surfaceType: 3 })
@@ -609,7 +621,8 @@ export function Calculator() {
         const coats = state.coats || 1
         const coverage = effCoverage(sp)
         const areaWithCoats = area * coats
-        const unitsNeeded = Math.ceil(areaWithCoats / coverage)
+        const fixedQty = perJobQty(sp.product)
+        const unitsNeeded = fixedQty ?? Math.ceil(areaWithCoats / coverage)
 
         // Shared products don't get F/W prefix, but get a badge
         const isSharedInBothMode = surface === 'both' && sp.shared_across_surfaces
@@ -619,7 +632,9 @@ export function Calculator() {
 
         // For shared products in both mode, make it very clear it covers both areas
         let qtyDisplay: string
-        if (isSharedInBothMode) {
+        if (fixedQty) {
+          qtyDisplay = `${fixedQty} per job`
+        } else if (isSharedInBothMode) {
           qtyDisplay = coats > 1 
             ? `${area.toFixed(1)}m² total (floor + wall combined) × ${coats} coats` 
             : `${area.toFixed(1)}m² total (floor + wall combined)`
@@ -640,7 +655,7 @@ export function Calculator() {
           surfaceType: isSharedPass ? 0 : (prefix === 'floor_' ? 1 : 2), // 0=shared, 1=floor, 2=wall
         })
 
-        if (state.pigment && sp.has_pigment) {
+        if (state.pigment && sp.has_pigment && !isNaturalShadeFor(sp.product)) {
           totalPigmentPacks += unitsNeeded
         }
       })
@@ -887,6 +902,9 @@ export function Calculator() {
                         state.pigment ? 'translate-x-5' : 'translate-x-0.5'
                       }`} />
                     </button>
+                    {state.pigment && isNaturalShadeFor(selectedProduct?.product) && (
+                      <span className="text-xs text-ash">{selectedColour.name} is this product's natural shade, so no pigment is needed</span>
+                    )}
                   </div>
                 )}
               </div>
@@ -1137,6 +1155,9 @@ export function Calculator() {
                               >
                                 <div className={`w-4 h-4 rounded-full bg-white shadow absolute top-0.5 transition-transform ${st.pigment ? 'translate-x-5' : 'translate-x-0.5'}`} />
                               </button>
+                              {st.pigment && isNaturalShadeFor(selected.product) && (
+                                <span className="text-xs text-ash">{selectedColour.name} is this product's natural shade, so no pigment is needed</span>
+                              )}
                             </div>
                           )}
                         </div>
