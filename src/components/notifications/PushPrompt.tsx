@@ -2,7 +2,7 @@
 // On iPhone/iPad in Safari it explains Add to Home Screen first (Apple only allows
 // web alerts for apps added to the home screen, iOS 16.4 or later).
 import { useEffect, useState } from 'react'
-import { Bell, Share, PlusSquare, X } from 'lucide-react'
+import { Bell, Share, PlusSquare, MoreHorizontal, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { enablePush, getPushState, type PushState } from '@/lib/push'
 
@@ -36,11 +36,11 @@ export function IosInstallSteps() {
     <ol className="text-sm text-ink space-y-1.5 mt-2">
       <li className="flex items-start gap-2">
         <span className="w-5 h-5 rounded-full bg-limestone text-xs font-semibold flex items-center justify-center shrink-0 mt-px">1</span>
-        <span>Tap <Share className="w-4 h-4 inline align-[-3px] text-basalt" aria-hidden="true" /> Share at the bottom of Safari</span>
+        <span>In Safari, tap <MoreHorizontal className="w-4 h-4 inline align-[-3px] text-basalt" aria-hidden="true" /> at the bottom, then <Share className="w-4 h-4 inline align-[-3px] text-basalt" aria-hidden="true" /> Share (on older iPhones, just tap Share)</span>
       </li>
       <li className="flex items-start gap-2">
         <span className="w-5 h-5 rounded-full bg-limestone text-xs font-semibold flex items-center justify-center shrink-0 mt-px">2</span>
-        <span>Choose <PlusSquare className="w-4 h-4 inline align-[-3px] text-basalt" aria-hidden="true" /> Add to Home Screen</span>
+        <span>Choose <PlusSquare className="w-4 h-4 inline align-[-3px] text-basalt" aria-hidden="true" /> Add to Home Screen (you may need to tap View More first)</span>
       </li>
       <li className="flex items-start gap-2">
         <span className="w-5 h-5 rounded-full bg-limestone text-xs font-semibold flex items-center justify-center shrink-0 mt-px">3</span>
