@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useColours } from '@/hooks/useProducts'
 import { useSettings } from '@/hooks/useSettings'
@@ -278,15 +279,15 @@ export function Calculator() {
   }, [surface, systems, selectedFamily])
 
   // Deep link from a notification: /?system=<id> opens the calculator on that system
-  const deepLinkDone = useRef(false)
+  // (also when a phone alert is tapped while the calculator is already open)
+  const location = useLocation()
   useEffect(() => {
-    if (deepLinkDone.current || systems.length === 0) return
-    deepLinkDone.current = true
+    if (systems.length === 0) return
     const params = new URLSearchParams(window.location.search)
     const id = params.get('system')
     if (!id) return
     params.delete('system')
-    window.history.replaceState(null, '', window.location.pathname + (params.toString() ? `?${params}` : ''))
+    window.history.replaceState(window.history.state, '', window.location.pathname + (params.toString() ? `?${params}` : ''))
     const sys = systems.find(x => x.id === id)
     if (!sys || (sys.surface_type !== 'floor' && sys.surface_type !== 'wall')) return
     if (sys.family) setSelectedFamily(sys.family)
@@ -294,7 +295,7 @@ export function Calculator() {
     else { setWallSystemId(sys.id); setSurface('wall') }
     handleSystemChange(sys.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [systems])
+  }, [systems, location.key])
 
   // Auto-refresh product data when window regains focus (picks up admin changes)
   // This updates prices/names but preserves user's layer selections

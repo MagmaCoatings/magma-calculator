@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { resyncPush } from '@/lib/push'
 import { useAuth } from '@/hooks/useAuth'
 import type { InboxItem } from '@/lib/notifications'
 
@@ -22,6 +24,7 @@ const SELECT = 'notification_id, delivered_at, read_at, opened_at, notification:
 
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [items, setItems] = useState<InboxItem[]>([])
   const [loading, setLoading] = useState(false)
   const [incoming, setIncoming] = useState<InboxItem | null>(null)
@@ -102,6 +105,38 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     await supabase.from('notification_recipients').update({ read_at: now })
       .eq('notification_id', notificationId).eq('user_id', user.id).is('read_at', null)
   }, [user])
+
+  // Opened from a phone alert: the link carries ?n=<id>. Record the open, then tidy the address bar.
+  useEffect(() => {
+    if (!user) return
+    const params = new URLSearchParams(window.location.search)
+    const id = params.get('n')
+    if (!id) return
+    params.delete('n')
+    window.history.replaceState(window.history.state, '', window.location.pathname + (params.toString() ? `?${params}` : '') + window.location.hash)
+    if (/^[0-9a-f-]{36}$/i.test(id)) markOpened(id).then(refresh)
+  }, [user, markOpened, refresh])
+
+  // Keep this device's phone alerts linked to whoever is signed in
+  useEffect(() => {
+    if (user) resyncPush().catch(() => undefined)
+  }, [user])
+
+  // Phone alert tapped while Magma is already open: the service worker hands over the link
+  useEffect(() => {
+    if (!user || !('serviceWorker' in navigator)) return
+    const onMessage = (event: MessageEvent) => {
+      const msg = event.data as { type?: string; url?: string } | null
+      if (!msg || msg.type !== 'magma-open' || typeof msg.url !== 'string' || !msg.url.startsWith('/')) return
+      const target = new URL(msg.url, window.location.origin)
+      const id = target.searchParams.get('n')
+      target.searchParams.delete('n')
+      if (id && /^[0-9a-f-]{36}$/i.test(id)) markOpened(id).then(refresh)
+      navigate(target.pathname + target.search)
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage)
+  }, [user, markOpened, refresh, navigate])
 
   const markAllRead = useCallback(async () => {
     if (!user) return

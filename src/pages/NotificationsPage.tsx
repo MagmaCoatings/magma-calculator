@@ -4,6 +4,7 @@ import { useNotifications } from '@/hooks/useNotifications'
 import { useOpenNotification } from '@/components/notifications/NotificationBell'
 import { CATEGORY_LABELS, notificationCta, relativeTime } from '@/lib/notifications'
 import { MagmaSpinner } from '@/components/brand/MagmaMark'
+import { PushPrompt } from '@/components/notifications/PushPrompt'
 
 export function NotificationsPage() {
   const { items, unreadCount, loading, markAllRead } = useNotifications()
@@ -19,6 +20,8 @@ export function NotificationsPage() {
           </button>
         )}
       </div>
+
+      <PushPrompt className="mb-4" />
 
       {loading && items.length === 0 ? (
         <div className="flex justify-center py-12"><MagmaSpinner size={40} /></div>

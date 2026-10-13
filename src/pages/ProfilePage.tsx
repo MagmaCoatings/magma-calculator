@@ -6,6 +6,8 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Save, User, Building, MapPin, Phone, Globe, Check, Bell } from 'lucide-react'
 import { DEFAULT_NOTIFY_PREFS, type NotifyPrefs } from '@/lib/notifications'
+import { enablePush, disablePush } from '@/lib/push'
+import { usePushState, IosInstallSteps } from '@/components/notifications/PushPrompt'
 
 interface ProfileFormData {
   first_name: string
@@ -94,6 +96,22 @@ export function ProfilePage() {
       .replace(/^@/, '')
       .replace(/^https?:\/\/(www\.)?instagram\.com\//, '')
       .replace(/\/$/, '')
+  }
+
+  const [pushState, setPushState] = usePushState()
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushError, setPushError] = useState<string | null>(null)
+
+  async function toggleDevicePush() {
+    setPushBusy(true)
+    setPushError(null)
+    try {
+      setPushState(pushState === 'on' ? await disablePush() : await enablePush())
+    } catch {
+      setPushError('Could not change phone alerts. Please try again.')
+    } finally {
+      setPushBusy(false)
+    }
   }
 
   async function togglePref(key: keyof NotifyPrefs) {
@@ -389,12 +407,43 @@ export function ProfilePage() {
                   onClick={() => togglePref(key)}
                   className={`w-12 h-7 shrink-0 rounded-full relative transition-colors ${prefs[key] ? 'bg-sage' : 'bg-ash'}`}
                 >
-                  <span className={`absolute top-1 w-5 h-5 rounded-full bg-bone shadow transition-transform ${prefs[key] ? 'translate-x-6' : 'translate-x-1'}`} />
+                  <span className={`absolute left-0 top-1 w-5 h-5 rounded-full bg-bone shadow transition-transform ${prefs[key] ? 'translate-x-6' : 'translate-x-1'}`} />
                 </button>
               </div>
             ))}
           </div>
           {prefsError && <p className="text-sm text-danger mt-2">{prefsError}</p>}
+
+          {pushState && pushState !== 'unsupported' && (
+            <div className="border-t border-line mt-3 pt-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-basalt">Phone alerts on this device</p>
+                  <p className="text-xs text-stone">
+                    {pushState === 'on' ? 'Alerts pop up on this device, even when Magma is closed'
+                      : pushState === 'denied' ? 'Blocked: allow notifications for this site in your browser or phone settings'
+                      : pushState === 'needs-install' ? 'On iPhone, add Magma to your home screen first'
+                      : 'Messages always appear under the bell; turn this on to get alerts too'}
+                  </p>
+                </div>
+                {(pushState === 'on' || pushState === 'off') && (
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={pushState === 'on'}
+                    aria-label="Phone alerts on this device"
+                    disabled={pushBusy}
+                    onClick={toggleDevicePush}
+                    className={`w-12 h-7 shrink-0 rounded-full relative transition-colors disabled:opacity-60 ${pushState === 'on' ? 'bg-sage' : 'bg-ash'}`}
+                  >
+                    <span className={`absolute left-0 top-1 w-5 h-5 rounded-full bg-bone shadow transition-transform ${pushState === 'on' ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                )}
+              </div>
+              {pushState === 'needs-install' && <IosInstallSteps />}
+              {pushError && <p className="text-sm text-danger mt-2">{pushError}</p>}
+            </div>
+          )}
         </Card>
 
         {/* Save */}
