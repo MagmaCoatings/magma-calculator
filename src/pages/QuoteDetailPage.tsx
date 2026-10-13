@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { formatCurrency, surfaceLabel, areaLabel, quoteVatRate, vatLabel, pennies } from '@/lib/formatters'
 import { ArrowLeft, Pencil, Save, Copy, Trash2, FileText, Send, CheckCircle, XCircle, Plus, Download, Mail, History, Clock } from 'lucide-react'
 import { QuotePDF } from '@/components/QuotePDF'
+import { openOrderEmail } from '@/lib/orderEmail'
 import { ProductPicker } from '@/components/ProductPicker'
 import { MagmaSpinner } from '@/components/brand/MagmaMark'
 import { 
@@ -456,56 +457,21 @@ export function QuoteDetailPage() {
 
   function sendQuoteEmail() {
     if (!quote) return
-
-    const getAreaDisplay = () => areaLabel(quote.surface_type, quote.floor_area, quote.wall_area)
-
-    const materialsList = items.map(item => 
-      `${item.quantity} × ${item.product_name} @ £${formatCurrency(item.unit_price)} each = £${formatCurrency(item.line_total)}`
-    ).join('\n')
-
-    const senderName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || profile?.full_name || ''
-    const company = profile?.company_name || ''
-
-    const subject = [`Quote ${quote.reference}`, quote.project_name, company].filter(Boolean).join(' - ')
-
-    // Sender's full company details (from their profile) for the footer
-    const addressLine = [profile?.address_line1, profile?.address_line2, profile?.address_line3, profile?.town_city, profile?.postcode]
-      .filter(Boolean).join(', ')
-    const details = [
-      senderName,
-      company,
-      addressLine,
-      profile?.phone ? `Tel: ${profile.phone}` : '',
-      profile?.mobile ? `Mobile: ${profile.mobile}` : '',
-      user?.email ? `Email: ${user.email}` : '',
-      profile?.website_url ? `Web: ${profile.website_url}` : '',
-      profile?.instagram_handle ? `Instagram: @${profile.instagram_handle.replace(/^@/, '')}` : '',
-      profile?.facebook_url ? `Facebook: ${profile.facebook_url}` : '',
-    ].filter(Boolean)
-    const signature = 'Thank you,\n\n' + details.join('\n')
-
-    const body = `Could I please place the order for the following materials:
-
-QUOTE REFERENCE: ${quote.reference}
-${quote.client_name ? `\nClient: ${quote.client_name}` : ''}
-Surface: ${surfaceLabel(quote.surface_type)}
-Area: ${getAreaDisplay()}
-
-MATERIALS
-${materialsList}
-
-TOTALS
-Subtotal: £${formatCurrency(quote.subtotal)}
-${vatLabel(quoteVatRate(quote.subtotal, quote.vat))}: £${formatCurrency(quote.vat)}
-Total: £${formatCurrency(quote.total)}
-
-PALLET / DELIVERY COSTS: TBC
-(Quoted at time of order)
-
-${signature}`
-
-    const mailtoLink = `mailto:sales@magmacoatings.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-    window.location.href = mailtoLink
+    openOrderEmail({
+      reference: quote.reference,
+      clientName: quote.client_name,
+      projectName: quote.project_name,
+      surface: surfaceLabel(quote.surface_type),
+      area: areaLabel(quote.surface_type, quote.floor_area, quote.wall_area),
+      colour: quote.custom_colour_name,
+      items: items.map(i => ({ quantity: i.quantity, name: i.product_name, unitPrice: i.unit_price, total: i.line_total })),
+      subtotal: quote.subtotal,
+      vat: quote.vat,
+      total: quote.total,
+      vatRate: quoteVatRate(quote.subtotal, quote.vat),
+      profile,
+      userEmail: user?.email,
+    })
   }
 
   function formatDate(dateStr: string) {

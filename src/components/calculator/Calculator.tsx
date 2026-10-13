@@ -3,10 +3,11 @@ import { supabase } from '@/lib/supabase'
 import { useColours } from '@/hooks/useProducts'
 import { useSettings } from '@/hooks/useSettings'
 import { useAuth } from '@/hooks/useAuth'
-import { formatCurrency, vatLabel } from '@/lib/formatters'
+import { formatCurrency, vatLabel, surfaceLabel, areaLabel } from '@/lib/formatters'
 import { Button } from '@/components/ui/button'
 import { InfoTip } from '@/components/ui/InfoTip'
-import { Copy, Check, ChevronUp, ChevronDown, Package } from 'lucide-react'
+import { Copy, Check, ChevronUp, ChevronDown, Package, Mail, X } from 'lucide-react'
+import { openOrderEmail } from '@/lib/orderEmail'
 import { SaveQuoteModal } from '@/components/SaveQuoteModal'
 import { MagmaSpinner } from '@/components/brand/MagmaMark'
 
@@ -82,7 +83,7 @@ interface LayerState {
 export function Calculator() {
   const { coloursByFamily, loading: coloursLoading } = useColours()
   const { settings, loading: settingsLoading } = useSettings()
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
   const showTooltips = profile?.show_tooltips ?? true
   const [systems, setSystems] = useState<System[]>([])
   const [families, setFamilies] = useState<string[]>([])
@@ -118,6 +119,8 @@ export function Calculator() {
   
   // Save quote modal
   const [showSaveModal, setShowSaveModal] = useState(false)
+  // After copying or emailing an unsaved quote, offer to save it
+  const [offerSave, setOfferSave] = useState<null | 'copied' | 'emailed'>(null)
 
   // Consumables (universal, admin-managed extras)
   const [consumables, setConsumables] = useState<{ id: string; name: string; code: string; price: number; pack_size: number; pack_unit: string; consumable_group: string | null; consumable_min_order: number | null }[]>([])
@@ -947,6 +950,32 @@ export function Calculator() {
     navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+    setOfferSave('copied')
+  }
+
+  // Email the order to Magma straight from the calculator, without saving first
+  function emailOrder() {
+    const savedFloor = surface === 'custom' ? totalArea : surface === 'wall' ? 0 : floorAreaNum
+    const savedWall = surface === 'custom' || surface === 'floor' ? 0 : wallAreaNum
+    openOrderEmail({
+      reference: null,
+      surface: surfaceLabel(surface),
+      area: areaLabel(surface, savedFloor, savedWall),
+      colour: activeColourName,
+      items: quoteItems.map(i => ({ quantity: i.quantity, name: i.name, unitPrice: i.unitPrice, total: i.total })),
+      subtotal,
+      vat,
+      total,
+      vatRate: settings.vat_rate,
+      profile,
+      userEmail: user?.email,
+    })
+    setOfferSave('emailed')
+  }
+
+  function openSave() {
+    setOfferSave(null)
+    setShowSaveModal(true)
   }
 
   if (loading || coloursLoading || settingsLoading) {
@@ -1553,13 +1582,25 @@ export function Calculator() {
           <div className="bg-bone border border-line rounded-xl p-5 shadow-sm">
             <div className="flex justify-between items-center mb-4">
               <h2 className="font-medium text-basalt">Materials</h2>
-              <button
-                onClick={copyList}
-                className="flex items-center gap-1.5 text-sm text-stone hover:text-molten-ink"
-              >
-                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={emailOrder}
+                  disabled={items.length === 0}
+                  className="flex items-center gap-1.5 text-sm text-stone hover:text-molten-ink disabled:opacity-40"
+                  title="Email this order to Magma (no need to save first)"
+                >
+                  <Mail className="w-4 h-4" />
+                  Email
+                </button>
+                <button
+                  onClick={copyList}
+                  disabled={items.length === 0}
+                  className="flex items-center gap-1.5 text-sm text-stone hover:text-molten-ink disabled:opacity-40"
+                >
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
             </div>
 
             {items.length === 0 ? (
@@ -1627,7 +1668,7 @@ export function Calculator() {
             className="w-full mt-4 hidden lg:flex" 
             size="lg"
             disabled={items.length === 0}
-            onClick={() => setShowSaveModal(true)}
+            onClick={openSave}
           >
             Save Quote
           </Button>
@@ -1667,9 +1708,19 @@ export function Calculator() {
               {copied ? <Check className="w-4 h-4 text-sage" /> : <Copy className="w-4 h-4" />}
             </Button>
             <Button
+              variant="outline"
+              className="min-h-[48px] px-3 shrink-0"
+              disabled={items.length === 0}
+              onClick={emailOrder}
+              aria-label="Email order to Magma"
+              title="Email order"
+            >
+              <Mail className="w-4 h-4" />
+            </Button>
+            <Button
               className="flex-1 min-h-[48px]"
               disabled={items.length === 0}
-              onClick={() => setShowSaveModal(true)}
+              onClick={openSave}
             >
               Save Quote
             </Button>
@@ -1679,6 +1730,28 @@ export function Calculator() {
 
       <p className="text-center text-xs text-ash mt-8 hidden lg:block">© Magma Coatings Ltd</p>
       
+      {/* Offer to save after copying or emailing an unsaved quote */}
+      {offerSave && !showSaveModal && items.length > 0 && (
+        <div
+          role="status"
+          className="fixed z-[60] left-4 right-4 bottom-[calc(9.5rem+env(safe-area-inset-bottom))] lg:left-auto lg:right-6 lg:bottom-6 lg:w-96 bg-basalt text-bone rounded-xl shadow-lg p-4 flex items-start gap-3"
+        >
+          <div className="flex-1">
+            <p className="text-sm font-medium">{offerSave === 'copied' ? 'Materials list copied.' : 'Order email opened.'}</p>
+            <p className="text-xs text-bone/80 mt-0.5">This quote isn't saved yet. Save it to find it later in Quotes.</p>
+            <button
+              onClick={openSave}
+              className="mt-3 px-4 py-2 rounded-lg bg-molten text-white text-sm font-medium hover:bg-molten-ink min-h-[40px]"
+            >
+              Save quote
+            </button>
+          </div>
+          <button onClick={() => setOfferSave(null)} aria-label="Dismiss" className="p-1 text-bone/70 hover:text-bone">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Save Quote Modal */}
       <SaveQuoteModal
         isOpen={showSaveModal}
