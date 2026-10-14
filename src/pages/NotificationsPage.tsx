@@ -44,7 +44,7 @@ export function NotificationsPage() {
                   className={`w-full text-left flex gap-3 px-4 py-4 hover:bg-limestone ${unread ? 'bg-bone' : 'bg-transparent'}`}
                 >
                   <span aria-hidden="true" className={`w-2 h-2 rounded-full mt-2 shrink-0 ${unread ? 'bg-molten' : 'bg-transparent'}`} />
-                  <span className="min-w-0 flex-1">
+                  <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                     <span className="block text-[11px] font-semibold tracking-wide text-stone uppercase">
                       {CATEGORY_LABELS[n.category]} · {relativeTime(item.delivered_at)}
                       {unread && <span className="sr-only"> (unread)</span>}

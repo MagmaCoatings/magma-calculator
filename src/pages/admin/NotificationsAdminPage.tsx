@@ -430,17 +430,18 @@ export function NotificationsAdminPage() {
             <div className="bg-[#2E2B28] rounded-2xl p-4">
               <div className="bg-bone/95 rounded-2xl p-3 flex gap-3">
                 <span className="w-9 h-9 rounded-lg bg-molten text-basalt font-bold flex items-center justify-center shrink-0">M</span>
-                <span className="min-w-0">
+                <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                   <span className="flex justify-between text-xs text-stone"><span className="font-semibold text-ink">MAGMA</span><span>now</span></span>
-                  <span className="block text-sm font-semibold text-basalt">{previewTitle}</span>
-                  <span className="block text-sm text-ink leading-snug">{previewBody}</span>
+                  <span className="text-sm font-semibold text-basalt line-clamp-1">{previewTitle}</span>
+                  {/* Phones show about four lines on the lock screen, then cut off */}
+                  <span className="text-sm text-ink leading-snug line-clamp-4">{previewBody}</span>
                 </span>
               </div>
             </div>
             <p className="text-xs font-medium tracking-wide text-stone uppercase pt-2">Preview: in the app's bell</p>
             <div className="bg-bone border border-line rounded-xl p-4 flex gap-3">
               <span className="w-2 h-2 rounded-full bg-molten mt-2 shrink-0" />
-              <span className="min-w-0">
+              <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                 <span className="block text-[11px] font-semibold tracking-wide text-stone uppercase">{CATEGORY_LABELS[category]} · Just now</span>
                 <span className="block text-sm font-semibold text-basalt mt-0.5">{previewTitle}</span>
                 <span className="block text-sm text-ink mt-0.5">{previewBody}</span>
@@ -513,7 +514,7 @@ export function NotificationsAdminPage() {
                     <span className="text-xs font-semibold text-stone w-5 pt-0.5">{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-basalt">{n.title}</p>
-                      <p className="text-sm text-ink">{n.body}</p>
+                      <p className="text-sm text-ink [overflow-wrap:anywhere]">{n.body}</p>
                       <p className="text-xs text-stone truncate">{n.url}{n.last_sent_at ? ` · last sent ${fmt(n.last_sent_at)}` : ''}</p>
                     </div>
                     <Switch on={n.active} label={`Use "${n.title}"`} onChange={() => toggleNudge(n)} />
@@ -557,7 +558,7 @@ export function NotificationsAdminPage() {
                       <td className="px-5 py-3 text-stone whitespace-nowrap">
                         {h.status === 'scheduled' ? <>Scheduled<br />{fmt(h.send_at)}</> : h.status === 'cancelled' ? <>Cancelled<br />{fmt(h.send_at)}</> : fmt(h.sent_at || h.send_at)}
                       </td>
-                      <td className="px-3 py-3"><p className="font-medium text-basalt">{h.title}</p><p className="text-ink">{h.body}</p></td>
+                      <td className="px-3 py-3 [overflow-wrap:anywhere]"><p className="font-medium text-basalt">{h.title}</p><p className="text-ink">{h.body}</p></td>
                       <td className="px-3 py-3"><span className={`text-xs font-medium px-2.5 py-1 rounded-full ${h.kind === 'manual' ? 'bg-molten-tint text-molten-ink' : 'bg-sage-tint text-sage'}`}>{KIND_LABELS[h.kind]}</span></td>
                       <td className="px-3 py-3 text-ink">{h.audience === 'all' ? 'All installers' : `${h.audience_user_ids.length} selected`}</td>
                       <td className="px-5 py-3 text-ink whitespace-nowrap">
