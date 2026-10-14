@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { MagmaSpinner } from '@/components/brand/MagmaMark'
-import { Bell, Send, Clock, Trash2, Plus, X, Smartphone } from 'lucide-react'
+import { Bell, Send, Clock, Trash2, Plus, X, Smartphone, ChevronDown, ChevronUp } from 'lucide-react'
 import {
   CATEGORY_LABELS, notificationCta,
   type NotificationCategory, type NotificationKind, type NotificationLinkType,
@@ -23,12 +23,24 @@ interface Settings {
   nudge_gap_days: number
   auto_send_time: string
   weekly_cap: number
+  followup_title?: string // editable wording (present once sql/followup_templates.sql has been run)
+  followup_body?: string
+}
+
+const DEFAULT_FOLLOWUP_TITLE = '{project} is {age} old'
+const DEFAULT_FOLLOWUP_BODY = 'Quote {reference} is ready when you are. Tap to open it and email the order to Magma.'
+
+// Same rules as public.fill_quote_template in the database
+function fillQuoteTemplate(t: string, days: number, max: number) {
+  const age = days === 7 ? 'a week' : days === 14 ? 'two weeks' : `${days} days`
+  return t.split('{project}').join('Bathroom over tiles').split('{reference}').join('MQ-2026-0040')
+    .split('{age}').join(age).split('{days}').join(String(days)).slice(0, max)
 }
 interface NudgeRow { id: string; title: string; body: string; url: string; position: number; active: boolean; last_sent_at: string | null }
 interface HistoryRow {
   id: string; title: string; body: string; category: NotificationCategory; kind: NotificationKind
   audience: 'all' | 'selected'; audience_user_ids: string[]; status: 'scheduled' | 'sent' | 'cancelled'
-  send_at: string; sent_at: string | null; recipient_count: number
+  send_at: string; sent_at: string | null; recipient_count: number; send_push: boolean
 }
 
 interface AlertPerson {
@@ -60,7 +72,7 @@ function Switch({ on, onChange, label }: { on: boolean; onChange: () => void; la
   return (
     <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={onChange}
       className={`w-12 h-7 shrink-0 rounded-full relative transition-colors ${on ? 'bg-sage' : 'bg-ash'}`}>
-      <span className={`absolute top-1 w-5 h-5 rounded-full bg-bone shadow transition-transform ${on ? 'translate-x-6' : 'translate-x-1'}`} />
+      <span className={`absolute left-0 top-1 w-5 h-5 rounded-full bg-bone shadow transition-transform ${on ? 'translate-x-6' : 'translate-x-1'}`} />
     </button>
   )
 }
@@ -133,6 +145,33 @@ export function NotificationsAdminPage() {
 
   useEffect(() => { if (tab === 'history') loadHistory(); if (tab === 'people') loadAlertPeople() }, [tab])
 
+  // ---- History: who received one message
+  interface RecipientRow { user_id: string; delivered_at: string; read_at: string | null; opened_at: string | null }
+  const [openHistoryId, setOpenHistoryId] = useState<string | null>(null)
+  const [recipients, setRecipients] = useState<Record<string, RecipientRow[]>>({})
+  const [alertUsers, setAlertUsers] = useState<Set<string>>(new Set())
+  const [nameById, setNameById] = useState<Record<string, { name: string; company: string }>>({})
+  async function toggleRecipients(id: string) {
+    if (openHistoryId === id) { setOpenHistoryId(null); return }
+    setOpenHistoryId(id)
+    if (recipients[id]) return
+    const [{ data: r }, { data: subs }, { data: profs }] = await Promise.all([
+      supabase.from('notification_recipients').select('user_id, delivered_at, read_at, opened_at').eq('notification_id', id),
+      supabase.from('push_subscriptions').select('user_id'),
+      supabase.from('profiles').select('id, email, full_name, first_name, last_name, company_name'),
+    ])
+    setAlertUsers(new Set(((subs as { user_id: string }[]) || []).map(x => x.user_id)))
+    const names: Record<string, { name: string; company: string }> = {}
+    for (const p of (profs as { id: string; email: string | null; full_name: string | null; first_name: string | null; last_name: string | null; company_name: string | null }[]) || []) {
+      names[p.id] = { name: p.full_name || [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email || 'Unnamed', company: p.company_name || p.email || '' }
+    }
+    setNameById(names)
+    const rows = ((r as RecipientRow[]) || []).sort((a, b) =>
+      Number(!!b.opened_at) - Number(!!a.opened_at) || Number(!!b.read_at) - Number(!!a.read_at) ||
+      (names[a.user_id]?.name || '').localeCompare(names[b.user_id]?.name || ''))
+    setRecipients(prev => ({ ...prev, [id]: rows }))
+  }
+
   // ---- Who has phone alerts on
   const [alertPeople, setAlertPeople] = useState<AlertPerson[] | null>(null)
   async function loadAlertPeople() {
@@ -175,7 +214,7 @@ export function NotificationsAdminPage() {
   async function loadHistory() {
     setHistoryLoading(true)
     const { data } = await supabase.from('notifications')
-      .select('id, title, body, category, kind, audience, audience_user_ids, status, send_at, sent_at, recipient_count')
+      .select('id, title, body, category, kind, audience, audience_user_ids, status, send_at, sent_at, recipient_count, send_push')
       .order('created_at', { ascending: false }).limit(100)
     setHistory((data as HistoryRow[]) || [])
     const { data: s } = await supabase.rpc('notification_stats')
@@ -485,7 +524,45 @@ export function NotificationsAdminPage() {
                 <input type="number" min={1} max={60} className="w-20 min-h-[40px] px-2 rounded-lg border border-line text-center" value={settings.quote_followup_days}
                   onChange={e => setSettings({ ...settings, quote_followup_days: Number(e.target.value) })} onBlur={() => saveSettings(settings)} /> days
               </label>
-              <p className="text-sm bg-limestone rounded-lg px-3 py-2">Example: <strong className="text-basalt">Smith Bathroom is a week old.</strong> Quote MQ-0123 is ready when you are.</p>
+              {settings.followup_title !== undefined && settings.followup_body !== undefined ? (
+                <div className="space-y-3 pt-1">
+                  <div>
+                    <label htmlFor="fu-title" className="block text-sm font-medium text-ink mb-1">
+                      Title <span className="font-normal text-stone">{settings.followup_title.length} / 80</span>
+                    </label>
+                    <input id="fu-title" className={inputCls} maxLength={80} value={settings.followup_title}
+                      onChange={e => setSettings({ ...settings, followup_title: e.target.value })}
+                      onBlur={() => settings.followup_title?.trim() ? saveSettings(settings) : saveSettings({ ...settings, followup_title: DEFAULT_FOLLOWUP_TITLE })} />
+                  </div>
+                  <div>
+                    <label htmlFor="fu-body" className="block text-sm font-medium text-ink mb-1">
+                      Message <span className="font-normal text-stone">{settings.followup_body.length} / 200</span>
+                    </label>
+                    <textarea id="fu-body" rows={2} className={`${inputCls} py-2.5`} maxLength={200} value={settings.followup_body}
+                      onChange={e => setSettings({ ...settings, followup_body: e.target.value })}
+                      onBlur={() => settings.followup_body?.trim() ? saveSettings(settings) : saveSettings({ ...settings, followup_body: DEFAULT_FOLLOWUP_BODY })} />
+                  </div>
+                  <p className="text-xs text-stone">
+                    These words are filled in for each quote: <code className="px-1 bg-line-soft rounded">{'{project}'}</code> project or client name,{' '}
+                    <code className="px-1 bg-line-soft rounded">{'{reference}'}</code> quote number,{' '}
+                    <code className="px-1 bg-line-soft rounded">{'{age}'}</code> “a week” or “10 days”,{' '}
+                    <code className="px-1 bg-line-soft rounded">{'{days}'}</code> the number of days. Changes save when you click away.
+                  </p>
+                  <div className="text-sm bg-limestone rounded-lg px-3 py-2 [overflow-wrap:anywhere]">
+                    <span className="text-xs text-stone uppercase tracking-wide font-medium">Example</span>
+                    <p className="font-semibold text-basalt mt-0.5">{fillQuoteTemplate(settings.followup_title, settings.quote_followup_days || 7, 80)}</p>
+                    <p className="text-ink">{fillQuoteTemplate(settings.followup_body, settings.quote_followup_days || 7, 200)}</p>
+                  </div>
+                  {(settings.followup_title !== DEFAULT_FOLLOWUP_TITLE || settings.followup_body !== DEFAULT_FOLLOWUP_BODY) && (
+                    <button type="button" className="text-sm text-molten-ink font-medium hover:underline min-h-[36px]"
+                      onClick={() => saveSettings({ ...settings, followup_title: DEFAULT_FOLLOWUP_TITLE, followup_body: DEFAULT_FOLLOWUP_BODY })}>
+                      Go back to the original wording
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm bg-limestone rounded-lg px-3 py-2">Example: <strong className="text-basalt">Bathroom over tiles is a week old.</strong> Quote MQ-2026-0040 is ready when you are.</p>
+              )}
             </div>
 
             <div className="bg-bone border border-line rounded-xl p-5 space-y-4">
@@ -553,8 +630,11 @@ export function NotificationsAdminPage() {
               <tbody>
                 {history.map(h => {
                   const st = stats[h.id]
+                  const isOpen = openHistoryId === h.id
+                  const list = recipients[h.id]
                   return (
-                    <tr key={h.id} className="border-t border-line-soft align-top">
+                    <Fragment key={h.id}>
+                    <tr className="border-t border-line-soft align-top">
                       <td className="px-5 py-3 text-stone whitespace-nowrap">
                         {h.status === 'scheduled' ? <>Scheduled<br />{fmt(h.send_at)}</> : h.status === 'cancelled' ? <>Cancelled<br />{fmt(h.send_at)}</> : fmt(h.sent_at || h.send_at)}
                       </td>
@@ -565,10 +645,56 @@ export function NotificationsAdminPage() {
                         {h.status === 'scheduled' ? (
                           <Button size="sm" variant="outline" onClick={() => cancelScheduled(h.id)}><X className="w-4 h-4 mr-1" /> Cancel</Button>
                         ) : h.status === 'sent' ? (
-                          `${st?.opened ?? 0} of ${st?.delivered ?? h.recipient_count}`
+                          <button type="button" onClick={() => toggleRecipients(h.id)} aria-expanded={isOpen}
+                            className="inline-flex items-center gap-1 min-h-[36px] text-molten-ink font-medium hover:underline">
+                            {st?.opened ?? 0} of {st?.delivered ?? h.recipient_count} · See who
+                            {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </button>
                         ) : '–'}
                       </td>
                     </tr>
+                    {isOpen && (
+                      <tr className="bg-limestone/60">
+                        <td colSpan={5} className="px-5 py-4">
+                          {!list ? <div className="flex justify-center py-4"><MagmaSpinner size={28} /></div> : list.length === 0 ? (
+                            <p className="text-stone">Nobody received this message.</p>
+                          ) : (
+                            <>
+                              <p className="text-xs text-stone mb-2">
+                                Received by {list.length}. Opened means they tapped it and followed the link. Read means they saw it in the bell but didn't tap it.
+                                {h.send_push ? ' Phone alerts shows whether that person has alerts turned on today.' : ' This message was sent to the bell only, without phone alerts.'}
+                              </p>
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="text-left text-xs text-stone uppercase tracking-wide">
+                                    <th className="py-2 pr-3 font-medium">Name</th>
+                                    <th className="py-2 pr-3 font-medium">Status</th>
+                                    <th className="py-2 font-medium">Phone alerts</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {list.map(r => {
+                                    const who = nameById[r.user_id]
+                                    return (
+                                      <tr key={r.user_id} className="border-t border-line-soft">
+                                        <td className="py-2 pr-3"><span className="font-medium text-basalt">{who?.name || 'Former user'}</span>{who?.company && <span className="text-stone"> · {who.company}</span>}</td>
+                                        <td className="py-2 pr-3">
+                                          {r.opened_at ? <span className="text-sage font-medium">Opened {fmt(r.opened_at)}</span>
+                                            : r.read_at ? <span className="text-ink">Read {fmt(r.read_at)}</span>
+                                            : <span className="text-stone">Not seen yet</span>}
+                                        </td>
+                                        <td className="py-2">{alertUsers.has(r.user_id) ? <span className="inline-flex items-center gap-1 text-ink"><Smartphone className="w-4 h-4 text-sage" aria-hidden="true" /> On</span> : <span className="text-stone">Off</span>}</td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   )
                 })}
               </tbody>
