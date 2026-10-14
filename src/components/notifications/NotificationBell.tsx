@@ -56,7 +56,7 @@ export function IncomingNotification() {
         >
           <span className="block text-[11px] font-semibold tracking-wide text-bone/70 uppercase">{CATEGORY_LABELS[n.category]}</span>
           <span className="block text-sm font-medium mt-0.5">{n.title}</span>
-          <span className="block text-xs text-bone/80 mt-0.5 line-clamp-2">{n.body}</span>
+          <span className="text-xs text-bone/80 mt-0.5 line-clamp-2 [overflow-wrap:anywhere]">{n.body}</span>
         </button>
         <button type="button" onClick={dismissIncoming} aria-label="Dismiss" className="p-1 text-bone/70 hover:text-bone">
           <X className="w-4 h-4" />
