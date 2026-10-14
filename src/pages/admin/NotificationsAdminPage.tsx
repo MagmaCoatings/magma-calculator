@@ -23,6 +23,18 @@ interface Settings {
   nudge_gap_days: number
   auto_send_time: string
   weekly_cap: number
+  followup_title?: string // editable wording (present once sql/followup_templates.sql has been run)
+  followup_body?: string
+}
+
+const DEFAULT_FOLLOWUP_TITLE = '{project} is {age} old'
+const DEFAULT_FOLLOWUP_BODY = 'Quote {reference} is ready when you are. Tap to open it and email the order to Magma.'
+
+// Same rules as public.fill_quote_template in the database
+function fillQuoteTemplate(t: string, days: number, max: number) {
+  const age = days === 7 ? 'a week' : days === 14 ? 'two weeks' : `${days} days`
+  return t.split('{project}').join('Bathroom over tiles').split('{reference}').join('MQ-2026-0040')
+    .split('{age}').join(age).split('{days}').join(String(days)).slice(0, max)
 }
 interface NudgeRow { id: string; title: string; body: string; url: string; position: number; active: boolean; last_sent_at: string | null }
 interface HistoryRow {
@@ -60,7 +72,7 @@ function Switch({ on, onChange, label }: { on: boolean; onChange: () => void; la
   return (
     <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={onChange}
       className={`w-12 h-7 shrink-0 rounded-full relative transition-colors ${on ? 'bg-sage' : 'bg-ash'}`}>
-      <span className={`absolute top-1 w-5 h-5 rounded-full bg-bone shadow transition-transform ${on ? 'translate-x-6' : 'translate-x-1'}`} />
+      <span className={`absolute left-0 top-1 w-5 h-5 rounded-full bg-bone shadow transition-transform ${on ? 'translate-x-6' : 'translate-x-1'}`} />
     </button>
   )
 }
@@ -512,7 +524,45 @@ export function NotificationsAdminPage() {
                 <input type="number" min={1} max={60} className="w-20 min-h-[40px] px-2 rounded-lg border border-line text-center" value={settings.quote_followup_days}
                   onChange={e => setSettings({ ...settings, quote_followup_days: Number(e.target.value) })} onBlur={() => saveSettings(settings)} /> days
               </label>
-              <p className="text-sm bg-limestone rounded-lg px-3 py-2">Example: <strong className="text-basalt">Smith Bathroom is a week old.</strong> Quote MQ-0123 is ready when you are.</p>
+              {settings.followup_title !== undefined && settings.followup_body !== undefined ? (
+                <div className="space-y-3 pt-1">
+                  <div>
+                    <label htmlFor="fu-title" className="block text-sm font-medium text-ink mb-1">
+                      Title <span className="font-normal text-stone">{settings.followup_title.length} / 80</span>
+                    </label>
+                    <input id="fu-title" className={inputCls} maxLength={80} value={settings.followup_title}
+                      onChange={e => setSettings({ ...settings, followup_title: e.target.value })}
+                      onBlur={() => settings.followup_title?.trim() ? saveSettings(settings) : saveSettings({ ...settings, followup_title: DEFAULT_FOLLOWUP_TITLE })} />
+                  </div>
+                  <div>
+                    <label htmlFor="fu-body" className="block text-sm font-medium text-ink mb-1">
+                      Message <span className="font-normal text-stone">{settings.followup_body.length} / 200</span>
+                    </label>
+                    <textarea id="fu-body" rows={2} className={`${inputCls} py-2.5`} maxLength={200} value={settings.followup_body}
+                      onChange={e => setSettings({ ...settings, followup_body: e.target.value })}
+                      onBlur={() => settings.followup_body?.trim() ? saveSettings(settings) : saveSettings({ ...settings, followup_body: DEFAULT_FOLLOWUP_BODY })} />
+                  </div>
+                  <p className="text-xs text-stone">
+                    These words are filled in for each quote: <code className="px-1 bg-line-soft rounded">{'{project}'}</code> project or client name,{' '}
+                    <code className="px-1 bg-line-soft rounded">{'{reference}'}</code> quote number,{' '}
+                    <code className="px-1 bg-line-soft rounded">{'{age}'}</code> “a week” or “10 days”,{' '}
+                    <code className="px-1 bg-line-soft rounded">{'{days}'}</code> the number of days. Changes save when you click away.
+                  </p>
+                  <div className="text-sm bg-limestone rounded-lg px-3 py-2 [overflow-wrap:anywhere]">
+                    <span className="text-xs text-stone uppercase tracking-wide font-medium">Example</span>
+                    <p className="font-semibold text-basalt mt-0.5">{fillQuoteTemplate(settings.followup_title, settings.quote_followup_days || 7, 80)}</p>
+                    <p className="text-ink">{fillQuoteTemplate(settings.followup_body, settings.quote_followup_days || 7, 200)}</p>
+                  </div>
+                  {(settings.followup_title !== DEFAULT_FOLLOWUP_TITLE || settings.followup_body !== DEFAULT_FOLLOWUP_BODY) && (
+                    <button type="button" className="text-sm text-molten-ink font-medium hover:underline min-h-[36px]"
+                      onClick={() => saveSettings({ ...settings, followup_title: DEFAULT_FOLLOWUP_TITLE, followup_body: DEFAULT_FOLLOWUP_BODY })}>
+                      Go back to the original wording
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm bg-limestone rounded-lg px-3 py-2">Example: <strong className="text-basalt">Bathroom over tiles is a week old.</strong> Quote MQ-2026-0040 is ready when you are.</p>
+              )}
             </div>
 
             <div className="bg-bone border border-line rounded-xl p-5 space-y-4">
