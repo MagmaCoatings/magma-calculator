@@ -11,6 +11,9 @@ import { Copy, Check, ChevronUp, ChevronDown, Package, Mail, X } from 'lucide-re
 import { openOrderEmail } from '@/lib/orderEmail'
 import { SaveQuoteModal } from '@/components/SaveQuoteModal'
 import { MagmaSpinner } from '@/components/brand/MagmaMark'
+import { useDocumentIndex } from '@/hooks/useDocumentIndex'
+import { DocChips } from '@/components/documents/DocChips'
+import { docsForProduct, docsForSystems } from '@/lib/documents'
 
 // Types
 interface System {
@@ -149,6 +152,8 @@ export function Calculator() {
   // Layout: folding stage sections, system picker sheet, Floor/Wall switch in Floor + Wall mode
   const [openStages, setOpenStages] = useState<{ [key: string]: boolean }>({})
   const [showSystemPicker, setShowSystemPicker] = useState(false)
+  // Data sheets and guides, shown beside products and systems
+  const { index: docIndex } = useDocumentIndex()
   const [editSurface, setEditSurface] = useState<'floor' | 'wall'>('floor')
 
   // Layer states - keyed by stage name or option_group (prefixed with floor_/wall_ in both mode)
@@ -862,6 +867,12 @@ export function Calculator() {
             {selectedProduct && effNote(selectedProduct) && (
               <p className="text-xs text-stone mt-0.5">{effNote(selectedProduct)}</p>
             )}
+            <DocChips
+              className="mt-1.5"
+              docs={docsForProduct(docIndex, selectedProduct?.product_id || layer.products[0]?.product_id)
+                .filter(d => d.doc_type === 'tds' || d.doc_type === 'sds')}
+              urls={docIndex.urls}
+            />
           </div>
           {layer.isOptional && (
             <button
@@ -1307,6 +1318,12 @@ export function Calculator() {
     )
   }
 
+  // The system(s) in use: for installation guides and saved with the quote
+  const activeSystemIds = (surface === 'floor' ? [floorSystemId]
+    : surface === 'wall' ? [wallSystemId]
+    : surface === 'both' ? [floorSystemId, wallSystemId]
+    : []).filter((x): x is string => !!x)
+
   // System summary line and picker contents
   const shortName = (id: string | null) => (systems.find(x => x.id === id)?.name || '').replace(/^(Floor|Wall)\s+/i, '')
   const systemSummary = surface === 'both'
@@ -1438,6 +1455,11 @@ export function Calculator() {
                   </span>
                   <span className="text-sm font-medium text-molten-ink shrink-0">Change</span>
                 </button>
+                {docsForSystems(docIndex, activeSystemIds).some(d => docIndex.urls[d.id]) && (
+                  <div className="px-5 pb-4 -mt-1">
+                    <DocChips long docs={docsForSystems(docIndex, activeSystemIds)} urls={docIndex.urls} />
+                  </div>
+                )}
               </div>
 
               {surface === 'both' && (
@@ -1936,6 +1958,7 @@ export function Calculator() {
         total={total}
         colourName={activeColourName}
         colourHex={useCustomColour ? (customColourHex || null) : selectedColour.hex}
+        systemIds={activeSystemIds}
       />
     </div>
   )

@@ -25,6 +25,7 @@ interface SaveQuoteModalProps {
   total: number
   colourName?: string | null
   colourHex?: string | null
+  systemIds?: string[] // systems the quote was built from (for its documents)
 }
 
 const pennies = (n: number) => Math.round(n * 100) / 100
@@ -41,6 +42,7 @@ export function SaveQuoteModal({
   total,
   colourName,
   colourHex,
+  systemIds = [],
 }: SaveQuoteModalProps) {
   const navigate = useNavigate()
   const [clientName, setClientName] = useState('')
@@ -72,27 +74,32 @@ export function SaveQuoteModal({
       const { data: { user } } = await supabase.auth.getUser()
 
       // Create quote
-      const { data: quote, error: quoteError } = await supabase
+      const header = {
+        reference,
+        client_name: clientName || null,
+        project_name: projectName || null,
+        surface_type: surfaceType,
+        floor_area: floorArea,
+        wall_area: wallArea,
+        notes: notes || null,
+        subtotal: pennies(subtotal),
+        vat: pennies(vat),
+        total: pennies(total),
+        status: 'draft',
+        created_by: user?.id || null,
+        // Colour used for the quote (swatch or custom); the pigment line also carries it
+        custom_colour_name: colourName || null,
+        custom_colour_hex: colourHex || null,
+      }
+      let { data: quote, error: quoteError } = await supabase
         .from('quotes')
-        .insert({
-          reference,
-          client_name: clientName || null,
-          project_name: projectName || null,
-          surface_type: surfaceType,
-          floor_area: floorArea,
-          wall_area: wallArea,
-          notes: notes || null,
-          subtotal: pennies(subtotal),
-          vat: pennies(vat),
-          total: pennies(total),
-          status: 'draft',
-          created_by: user?.id || null,
-          // Colour used for the quote (swatch or custom); the pigment line also carries it
-          custom_colour_name: colourName || null,
-          custom_colour_hex: colourHex || null,
-        })
+        .insert({ ...header, system_ids: systemIds })
         .select()
         .single()
+      // Before the document library's database update, quotes have no system_ids column: save without it
+      if (quoteError && /system_ids/.test(quoteError.message)) {
+        ({ data: quote, error: quoteError } = await supabase.from('quotes').insert(header).select().single())
+      }
 
       if (quoteError) {
         console.error('Error creating quote:', quoteError)
