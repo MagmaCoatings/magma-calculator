@@ -282,8 +282,8 @@ ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = EXCLUDED.file_s
 
 DROP POLICY IF EXISTS "Admins manage document files" ON storage.objects;
 CREATE POLICY "Admins manage document files" ON storage.objects FOR ALL TO authenticated
-  USING (bucket_id = 'documents' AND is_admin())
-  WITH CHECK (bucket_id = 'documents' AND is_admin());
+  USING (bucket_id = 'documents' AND public.is_admin())
+  WITH CHECK (bucket_id = 'documents' AND public.is_admin());
 
 DROP POLICY IF EXISTS "Read current document files" ON storage.objects;
 CREATE POLICY "Read current document files" ON storage.objects FOR SELECT TO anon, authenticated
