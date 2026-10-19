@@ -14,9 +14,9 @@ export function DocumentItem({ doc, urls, detail }: { doc: DocumentRow; urls?: D
         {ready ? <FileText className="w-5 h-5 text-molten-ink" aria-hidden="true" /> : <Clock className="w-5 h-5 text-stone" aria-hidden="true" />}
       </span>
       <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-        <p className="font-medium text-basalt flex items-center gap-1.5">
+        <p className="font-medium text-basalt">
           {doc.title}
-          {doc.visibility === 'installers' && <Lock className="w-3.5 h-3.5 text-stone shrink-0" aria-label="Installers only" />}
+          {doc.visibility === 'installers' && <Lock className="w-3.5 h-3.5 text-stone inline-block align-[-2px] ml-1.5" aria-label="Installers only" />}
         </p>
         <p className="text-xs text-stone mt-0.5">{meta}</p>
         {detail && <p className="text-xs text-stone mt-0.5">{detail}</p>}
