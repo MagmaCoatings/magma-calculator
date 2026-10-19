@@ -21,6 +21,10 @@ import { SettingsPage } from '@/pages/admin/SettingsPage'
 import { NotificationsProvider } from '@/hooks/useNotifications'
 import { NotificationsPage } from '@/pages/NotificationsPage'
 import { NotificationsAdminPage } from '@/pages/admin/NotificationsAdminPage'
+import { DocumentsPage } from '@/pages/DocumentsPage'
+import { DocumentLinkPage } from '@/pages/DocumentLinkPage'
+import { SharedDocumentsPage } from '@/pages/SharedDocumentsPage'
+import { DocumentsAdminPage } from '@/pages/admin/DocumentsAdminPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth()
@@ -79,13 +83,30 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+// After logging in, go back to the page that asked (e.g. an installers-only document link)
+function afterLogin(): string {
+  const next = new URLSearchParams(window.location.search).get('next') || '/'
+  return next.startsWith('/') && !next.startsWith('//') ? next : '/'
+}
+
 function AppRoutes() {
   const { user } = useAuth()
   
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/login" element={user ? <Navigate to={afterLogin()} replace /> : <LoginPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+      {/* Public, no login: permanent document links and client share pages */}
+      <Route path="/docs/:slug" element={<DocumentLinkPage />} />
+      <Route path="/share/:token" element={<SharedDocumentsPage />} />
+
+      <Route path="/documents" element={
+        <ProtectedRoute>
+          <Header />
+          <DocumentsPage />
+        </ProtectedRoute>
+      } />
       
       {/* Main App Routes */}
       <Route path="/" element={
@@ -184,6 +205,14 @@ function AppRoutes() {
         <AdminRoute>
           <AdminLayout>
             <NotificationsAdminPage />
+          </AdminLayout>
+        </AdminRoute>
+      } />
+
+      <Route path="/admin/documents" element={
+        <AdminRoute>
+          <AdminLayout>
+            <DocumentsAdminPage />
           </AdminLayout>
         </AdminRoute>
       } />

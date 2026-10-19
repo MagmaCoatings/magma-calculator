@@ -11,6 +11,7 @@ import { ArrowLeft, Pencil, Save, Copy, Trash2, FileText, Send, CheckCircle, XCi
 import { QuotePDF } from '@/components/QuotePDF'
 import { openOrderEmail } from '@/lib/orderEmail'
 import { ProductPicker } from '@/components/ProductPicker'
+import { QuoteDocuments } from '@/components/documents/QuoteDocuments'
 import { MagmaSpinner } from '@/components/brand/MagmaMark'
 import { 
   logQuoteStatusChange, 
@@ -38,6 +39,7 @@ interface Quote {
   updated_at: string
   custom_colour_name?: string | null
   custom_colour_hex?: string | null
+  system_ids?: string[] | null
 }
 
 interface QuoteItem {
@@ -403,6 +405,7 @@ export function QuoteDetailPage() {
         created_by: user?.id,
         custom_colour_name: quote.custom_colour_name ?? null,
         custom_colour_hex: quote.custom_colour_hex ?? null,
+        ...(quote.system_ids ? { system_ids: quote.system_ids } : {}),
       })
       .select()
       .single()
@@ -859,6 +862,15 @@ export function QuoteDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Documents for this quote's products and system */}
+      <QuoteDocuments
+        quoteId={quote.id}
+        reference={quote.reference}
+        projectName={quote.project_name}
+        productCodes={items.map(i => i.product_code).filter((c): c is string => !!c)}
+        systemIds={quote.system_ids ?? []}
+      />
 
       {/* History Panel */}
       {showHistory && (

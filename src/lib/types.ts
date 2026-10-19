@@ -110,6 +110,7 @@ export interface Quote {
   vat: number
   total: number
   status: string
+  system_ids?: string[] // systems the quote was built from (document library)
   created_by: string | null
   creator_name?: string
   creator_email?: string

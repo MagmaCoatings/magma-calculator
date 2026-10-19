@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
-import { LogOut, Settings, Calculator, FileText, User } from 'lucide-react'
+import { LogOut, Settings, Calculator, FileText, User, FolderOpen } from 'lucide-react'
 import { MagmaMark } from '@/components/brand/MagmaMark'
 import { NotificationBell, IncomingNotification } from '@/components/notifications/NotificationBell'
 
@@ -47,6 +47,17 @@ export function Header() {
                 >
                   <FileText className={`w-4 h-4 ${isActive('/quotes') || location.pathname.startsWith('/quotes/') ? 'text-molten' : 'text-ash'}`} />
                   Quotes
+                </Button>
+              </Link>
+
+              <Link to="/documents">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`gap-2 ${isActive('/documents') ? 'bg-molten-tint text-basalt' : ''}`}
+                >
+                  <FolderOpen className={`w-4 h-4 ${isActive('/documents') ? 'text-molten' : 'text-ash'}`} />
+                  Documents
                 </Button>
               </Link>
 
@@ -129,6 +140,15 @@ export function Header() {
             </div>
           </Link>
           
+          <Link to="/documents" className="flex-1">
+            <div className={`flex flex-col items-center py-2 ${isActive('/documents') ? 'text-basalt' : 'text-ash'}`}>
+              <div className={`p-1 rounded-lg ${isActive('/documents') ? 'bg-molten-tint' : ''}`}>
+                <FolderOpen className={`w-6 h-6 ${isActive('/documents') ? 'text-molten' : ''}`} />
+              </div>
+              <span className="text-xs mt-1 font-medium">Documents</span>
+            </div>
+          </Link>
+
           <Link to="/profile" className="flex-1">
             <div className={`flex flex-col items-center py-2 ${isActive('/profile') ? 'text-basalt' : 'text-ash'}`}>
               <div className={`p-1 rounded-lg ${isActive('/profile') ? 'bg-molten-tint' : ''}`}>

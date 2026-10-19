@@ -104,7 +104,7 @@ export function NotificationsAdminPage() {
   const [category, setCategory] = useState<NotificationCategory>((params.get('category') as NotificationCategory) || 'products')
   const [linkChoice, setLinkChoice] = useState<LinkChoice>((params.get('link') as LinkChoice) || 'calc')
   const [systemId, setSystemId] = useState(params.get('system') || '')
-  const [url, setUrl] = useState('')
+  const [url, setUrl] = useState(params.get('url') || '')
   const [audience, setAudience] = useState<'all' | 'selected'>('all')
   const [selected, setSelected] = useState<string[]>([])
   const [personSearch, setPersonSearch] = useState('')
