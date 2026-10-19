@@ -489,9 +489,9 @@ export function UsersPage() {
         <div className="space-y-3">
           {paginatedUsers.map(user => (
             <Card key={user.id} className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-1">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex-1 min-w-0 [overflow-wrap:anywhere]">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-1">
                     <span className="font-medium text-basalt">{user.full_name || 'Unnamed User'}</span>
                     {user.company_name && (
                       <span className="text-sm text-stone">({user.company_name})</span>
@@ -508,12 +508,12 @@ export function UsersPage() {
                     )}
                   </div>
                   <p className="text-sm text-stone">{user.email}</p>
-                  <div className="flex gap-4 text-xs text-ash mt-2">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ash mt-2">
                     <span>Joined: {formatDate(user.created_at)}</span>
                     <span>Last login: {formatDate(user.last_login)}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"

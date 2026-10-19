@@ -253,6 +253,27 @@ export function DocumentsAdminPage() {
   const shown = docs.filter(d => filter === 'all' || d.doc_type === filter)
   const productList = products.filter(p => !productSearch.trim() || p.name.toLowerCase().includes(productSearch.trim().toLowerCase()))
 
+  const openedLabel = (id: string) => {
+    const st = stats[id]
+    return st ? `${st.opens} by ${st.people} ${st.people === 1 ? 'person' : 'people'}` : '0'
+  }
+  const docTitle = (d: DocumentRow) => (
+    <p className="font-medium text-basalt">
+      {d.title}
+      {d.visibility === 'public'
+        ? <Globe className="w-3.5 h-3.5 text-stone inline-block align-[-2px] ml-1.5" aria-label="Public" />
+        : <Lock className="w-3.5 h-3.5 text-stone inline-block align-[-2px] ml-1.5" aria-label="Installers only" />}
+    </p>
+  )
+  const linkButton = (d: DocumentRow) => (
+    <button type="button" onClick={() => copy(permanentLink(d.slug), d.id)}
+      className="text-xs text-molten-ink hover:underline mt-1 flex items-start gap-1 min-h-[28px] text-left"
+      aria-label={`Copy link /docs/${d.slug}`}>
+      {copied === d.id ? <Check className="w-3.5 h-3.5 shrink-0 mt-px" /> : <Copy className="w-3.5 h-3.5 shrink-0 mt-px" />}
+      <span className="[overflow-wrap:anywhere]">{copied === d.id ? 'Link copied' : `/docs/${d.slug}`}</span>
+    </button>
+  )
+
   return (
     <div className="max-w-6xl">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
@@ -280,40 +301,33 @@ export function DocumentsAdminPage() {
         ))}
       </div>
 
-      <div className="bg-bone border border-line rounded-xl overflow-x-auto">
+      <div className="bg-bone border border-line rounded-xl">
         {shown.length === 0 ? (
           <p className="p-6 text-sm text-stone">No documents yet. Use <strong>Add document</strong> to upload a PDF, or create an entry now and add its PDF later (it shows as Coming soon).</p>
         ) : (
-          <table className="w-full text-sm min-w-[760px]">
-            <thead>
-              <tr className="text-left text-xs text-stone uppercase tracking-wide">
-                <th className="px-5 py-3 font-medium">Document</th>
-                <th className="px-3 py-3 font-medium">For</th>
-                <th className="px-3 py-3 font-medium">Version</th>
-                <th className="px-3 py-3 font-medium">Opened</th>
-                <th className="px-5 py-3 font-medium"><span className="sr-only">Actions</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map(d => {
-                const st = stats[d.id]
-                return (
+          <>
+            {/* Computer: table */}
+            <table className="hidden lg:table w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-stone uppercase tracking-wide">
+                  <th className="px-5 py-3 font-medium">Document</th>
+                  <th className="px-3 py-3 font-medium">For</th>
+                  <th className="px-3 py-3 font-medium">Version</th>
+                  <th className="px-3 py-3 font-medium">Opened</th>
+                  <th className="px-5 py-3 font-medium"><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map(d => (
                   <tr key={d.id} className="border-t border-line-soft align-top">
                     <td className="px-5 py-3 [overflow-wrap:anywhere]">
-                      <p className="font-medium text-basalt flex items-center gap-1.5">
-                        {d.visibility === 'public' ? <Globe className="w-3.5 h-3.5 text-stone" aria-label="Public" /> : <Lock className="w-3.5 h-3.5 text-stone" aria-label="Installers only" />}
-                        {d.title}
-                      </p>
+                      {docTitle(d)}
                       <p className="text-stone">{DOC_TYPE_LABELS[d.doc_type]}{hasFile(d) ? '' : ' · Coming soon (no PDF yet)'}</p>
-                      <button type="button" onClick={() => copy(permanentLink(d.slug), d.id)}
-                        className="text-xs text-molten-ink hover:underline mt-0.5 inline-flex items-center gap-1 min-h-[28px]">
-                        {copied === d.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        /docs/{d.slug}
-                      </button>
+                      {linkButton(d)}
                     </td>
                     <td className="px-3 py-3 text-ink">{linkedLabel(d.id)}</td>
                     <td className="px-3 py-3 text-ink">{issueLabel(d) || <span className="text-stone">–</span>}</td>
-                    <td className="px-3 py-3 text-ink whitespace-nowrap">{st ? `${st.opens} by ${st.people} ${st.people === 1 ? 'person' : 'people'}` : '0'}</td>
+                    <td className="px-3 py-3 text-ink whitespace-nowrap">{openedLabel(d.id)}</td>
                     <td className="px-5 py-3 text-right whitespace-nowrap">
                       {hasFile(d) && (
                         <Button size="sm" variant="ghost" onClick={() => d.file_path && openFile(d.file_path)} className="gap-1"><ExternalLink className="w-4 h-4" /> View</Button>
@@ -321,10 +335,32 @@ export function DocumentsAdminPage() {
                       <Button size="sm" variant="outline" onClick={() => openEditor(d)}>Edit</Button>
                     </td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Tablet and phone: one card per document */}
+            <ul className="lg:hidden divide-y divide-line-soft">
+              {shown.map(d => (
+                <li key={d.id} className="p-4 text-sm [overflow-wrap:anywhere]">
+                  {docTitle(d)}
+                  <p className="text-stone">{DOC_TYPE_LABELS[d.doc_type]}{hasFile(d) ? '' : ' · Coming soon (no PDF yet)'}</p>
+                  <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-ink">
+                    <dt className="text-stone">For</dt><dd>{linkedLabel(d.id)}</dd>
+                    <dt className="text-stone">Version</dt><dd>{issueLabel(d) || '–'}</dd>
+                    <dt className="text-stone">Opened</dt><dd>{openedLabel(d.id)}</dd>
+                  </dl>
+                  {linkButton(d)}
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {hasFile(d) && (
+                      <Button size="sm" variant="outline" onClick={() => d.file_path && openFile(d.file_path)} className="gap-1"><ExternalLink className="w-4 h-4" /> View</Button>
+                    )}
+                    <Button size="sm" variant="outline" onClick={() => openEditor(d)}>Edit</Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </div>
 
