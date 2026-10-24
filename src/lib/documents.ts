@@ -78,9 +78,16 @@ export function slugify(text: string): string {
 }
 
 /** The stored file name, which is also the name people see when they download it */
-export function downloadName(d: Pick<DocumentRow, 'title' | 'version'>): string {
+export function downloadName(d: Pick<DocumentRow, 'title' | 'version'>, ext: 'pdf' | 'docx' = 'pdf'): string {
   const base = `Magma ${d.title}${d.version ? ` ${d.version}` : ''}`.replace(/[^A-Za-z0-9 ._()&+-]+/g, '-').replace(/\s+/g, ' ').trim()
-  return `${base.slice(0, 120)}.pdf`
+  return `${base.slice(0, 120)}.${ext}`
+}
+
+export const MIME_DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+
+/** Word documents can't be viewed in the browser, only downloaded */
+export function isWordFile(d: Pick<DocumentRow, 'file_name' | 'file_path'>): boolean {
+  return /\.docx$/i.test(d.file_name || d.file_path || '')
 }
 
 /** Short-lived links to view and download files (one request each, however many files) */

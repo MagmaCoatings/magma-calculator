@@ -47,8 +47,17 @@ export function notificationTarget(n: Pick<AppNotification, 'link_type' | 'link_
       return { path: '/quotes' }
     case 'quote':
       return { path: n.link_target ? `/quotes/${encodeURIComponent(n.link_target)}` : '/quotes' }
-    case 'url':
-      return n.link_target && /^https:\/\//i.test(n.link_target) ? { url: n.link_target } : { path: '/' }
+    case 'url': {
+      if (!n.link_target || !/^https:\/\//i.test(n.link_target)) return { path: '/' }
+      // A link to a page of this app (e.g. the Media pack) opens in place, not in a new tab
+      try {
+        const u = new URL(n.link_target)
+        if (typeof window !== 'undefined' && (u.origin === window.location.origin || u.hostname === 'calculator.magmacoatings.com')) {
+          return { path: u.pathname + u.search }
+        }
+      } catch { /* not a valid address: treat as external */ }
+      return { url: n.link_target }
+    }
     default:
       return { path: '/' }
   }
@@ -60,7 +69,10 @@ export function notificationCta(n: Pick<AppNotification, 'link_type' | 'link_tar
     case 'system': return 'See it in the calculator'
     case 'quotes': return 'Open your quotes'
     case 'quote': return 'Open the quote'
-    case 'url': return /instagram\.com/i.test(n.link_target || '') ? 'Open Instagram' : 'Open the link'
+    case 'url':
+      if (/instagram\.com/i.test(n.link_target || '')) return 'Open Instagram'
+      if (/^https:\/\/[^/]+\/media(\/|\?|$)/i.test(n.link_target || '')) return 'Open the Media pack'
+      return 'Open the link'
     default: return 'Open the calculator'
   }
 }
