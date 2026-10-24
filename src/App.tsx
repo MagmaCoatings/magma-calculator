@@ -25,6 +25,9 @@ import { DocumentsPage } from '@/pages/DocumentsPage'
 import { DocumentLinkPage } from '@/pages/DocumentLinkPage'
 import { SharedDocumentsPage } from '@/pages/SharedDocumentsPage'
 import { DocumentsAdminPage } from '@/pages/admin/DocumentsAdminPage'
+import { MediaPage } from '@/pages/MediaPage'
+import { MediaSharePage } from '@/pages/MediaSharePage'
+import { MediaAdminPage } from '@/pages/admin/MediaAdminPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth()
@@ -100,6 +103,7 @@ function AppRoutes() {
       {/* Public, no login: permanent document links and client share pages */}
       <Route path="/docs/:slug" element={<DocumentLinkPage />} />
       <Route path="/share/:token" element={<SharedDocumentsPage />} />
+      <Route path="/m/:token" element={<MediaSharePage />} />
 
       <Route path="/documents" element={
         <ProtectedRoute>
@@ -108,6 +112,14 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
       
+      {/* Media pack: the page itself checks access and sends anyone without it back to the calculator */}
+      <Route path="/media" element={
+        <ProtectedRoute>
+          <Header />
+          <MediaPage />
+        </ProtectedRoute>
+      } />
+
       {/* Main App Routes */}
       <Route path="/" element={
         <ProtectedRoute>
@@ -213,6 +225,14 @@ function AppRoutes() {
         <AdminRoute>
           <AdminLayout>
             <DocumentsAdminPage />
+          </AdminLayout>
+        </AdminRoute>
+      } />
+
+      <Route path="/admin/media" element={
+        <AdminRoute>
+          <AdminLayout>
+            <MediaAdminPage />
           </AdminLayout>
         </AdminRoute>
       } />

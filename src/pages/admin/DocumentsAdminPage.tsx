@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { MagmaSpinner } from '@/components/brand/MagmaMark'
 import {
-  DOC_BUCKET, DOC_COLUMNS, DOC_TYPE_LABELS, DOC_TYPE_ORDER, clearDocumentCache, downloadName, fileSizeLabel, hasFile, issueLabel,
+  DOC_BUCKET, DOC_COLUMNS, DOC_TYPE_LABELS, DOC_TYPE_ORDER, clearDocumentCache, downloadName, fileSizeLabel, MIME_DOCX, hasFile, issueLabel,
   permanentLink, slugify, type DocType, type DocVisibility, type DocumentRow,
 } from '@/lib/documents'
 
@@ -139,8 +139,10 @@ export function DocumentsAdminPage() {
   function pickFile(f: File | null) {
     setFormError(null)
     if (!f) return
-    if (f.type !== 'application/pdf' && !/\.pdf$/i.test(f.name)) { setFormError('Please choose a PDF file.'); return }
-    if (f.size > MAX_BYTES) { setFormError(`That PDF is ${fileSizeLabel(f.size)}. The limit is 25 MB.`); return }
+    const isPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name)
+    const isDocx = f.type === MIME_DOCX || /\.docx$/i.test(f.name)
+    if (!isPdf && !isDocx) { setFormError('Please choose a PDF or a Word (.docx) file.'); return }
+    if (f.size > MAX_BYTES) { setFormError(`That file is ${fileSizeLabel(f.size)}. The limit is 25 MB.`); return }
     set('file', f)
   }
 
@@ -161,8 +163,9 @@ export function DocumentsAdminPage() {
     try {
       // 1. Upload a new PDF first (stored under its own folder, named as people will see it)
       if (draft.file) {
-        uploadedPath = `${crypto.randomUUID()}/${downloadName({ title, version: draft.version.trim() || null })}`
-        const up = await supabase.storage.from(DOC_BUCKET).upload(uploadedPath, draft.file, { contentType: 'application/pdf', upsert: false })
+        const docx = /\.docx$/i.test(draft.file.name)
+        uploadedPath = `${crypto.randomUUID()}/${downloadName({ title, version: draft.version.trim() || null }, docx ? 'docx' : 'pdf')}`
+        const up = await supabase.storage.from(DOC_BUCKET).upload(uploadedPath, draft.file, { contentType: docx ? MIME_DOCX : 'application/pdf', upsert: false })
         if (up.error) { uploadedPath = null; throw up.error }
       }
       // 2. Save the details, the file and the links in one step (all or nothing)
@@ -433,20 +436,20 @@ export function DocumentsAdminPage() {
             </div>
 
             <div>
-              <p className="text-sm font-medium text-ink mb-2">PDF</p>
-              <input ref={fileInput} type="file" accept="application/pdf,.pdf" className="hidden" onChange={e => { pickFile(e.target.files?.[0] || null); e.target.value = '' }} />
+              <p className="text-sm font-medium text-ink mb-2">File <span className="font-normal text-stone">(PDF, or Word .docx)</span></p>
+              <input ref={fileInput} type="file" accept={`application/pdf,.pdf,${MIME_DOCX},.docx`} className="hidden" onChange={e => { pickFile(e.target.files?.[0] || null); e.target.value = '' }} />
               <div className="flex flex-wrap items-center gap-3">
                 <Button type="button" variant="outline" onClick={() => fileInput.current?.click()} className="gap-2">
-                  <Upload className="w-4 h-4" /> {editing && hasFile(editing) ? 'Upload a new version' : 'Choose PDF'}
+                  <Upload className="w-4 h-4" /> {editing && hasFile(editing) ? 'Upload a new version' : 'Choose file'}
                 </Button>
                 <span className="text-sm text-ink [overflow-wrap:anywhere]">
                   {draft.file ? `${draft.file.name} (${fileSizeLabel(draft.file.size)}), uploads when you save`
                     : editing && hasFile(editing) ? `Current: ${editing.file_name || 'PDF'}${editing.file_size ? ` (${fileSizeLabel(editing.file_size)})` : ''}`
-                    : 'No PDF yet: shown to installers as Coming soon'}
+                    : 'No file yet: shown to installers as Coming soon'}
                 </span>
               </div>
               {draft.file && editing && hasFile(editing) && (
-                <p className="text-xs text-stone mt-1.5">The current PDF will be kept below as a past version. Remember to update the version and issue date.</p>
+                <p className="text-xs text-stone mt-1.5">The current file will be kept below as a past version. Remember to update the version and issue date.</p>
               )}
             </div>
 

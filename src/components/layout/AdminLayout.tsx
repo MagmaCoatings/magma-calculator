@@ -15,6 +15,7 @@ import {
   LogIn,
   Bell,
   FolderOpen,
+  Images,
   Menu,
   X,
 } from 'lucide-react'
@@ -31,6 +32,7 @@ const navItems = [
   { path: '/admin/users', label: 'Users', icon: Users },
   { path: '/admin/notifications', label: 'Notifications', icon: Bell },
   { path: '/admin/documents', label: 'Documents', icon: FolderOpen },
+  { path: '/admin/media', label: 'Media pack', icon: Images },
   { path: '/admin/logs', label: 'Login Logs', icon: LogIn },
   { path: '/admin/activity', label: 'Activity Log', icon: Activity },
   { path: '/admin/settings', label: 'Settings', icon: Settings },

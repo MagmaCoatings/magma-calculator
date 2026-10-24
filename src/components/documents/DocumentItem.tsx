@@ -1,12 +1,12 @@
 // One document in a list: what it is, which version, and View / Download
 import { FileText, Download, ExternalLink, Lock, Clock } from 'lucide-react'
-import { DOC_TYPE_LABELS, fileSizeLabel, hasFile, issueLabel, logDocumentEvent, type DocUrls, type DocumentRow } from '@/lib/documents'
+import { DOC_TYPE_LABELS, fileSizeLabel, hasFile, issueLabel, isWordFile, logDocumentEvent, type DocUrls, type DocumentRow } from '@/lib/documents'
 
 const actionCls = 'inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-lg border border-line bg-bone text-sm font-medium text-ink hover:border-stone'
 
 export function DocumentItem({ doc, urls, detail }: { doc: DocumentRow; urls?: DocUrls; detail?: string }) {
   const ready = hasFile(doc)
-  const meta = [DOC_TYPE_LABELS[doc.doc_type], issueLabel(doc), fileSizeLabel(doc.file_size)].filter(Boolean).join(' · ')
+  const meta = [DOC_TYPE_LABELS[doc.doc_type], isWordFile(doc) ? 'Word' : '', issueLabel(doc), fileSizeLabel(doc.file_size)].filter(Boolean).join(' · ')
 
   return (
     <div className="flex gap-3 py-3">
@@ -25,9 +25,11 @@ export function DocumentItem({ doc, urls, detail }: { doc: DocumentRow; urls?: D
           <p className="text-xs font-medium text-stone mt-2 inline-block bg-limestone rounded-full px-2.5 py-1">Coming soon</p>
         ) : urls ? (
           <div className="flex flex-wrap gap-2 mt-2">
-            <a className={actionCls} href={urls.view} target="_blank" rel="noopener noreferrer" onClick={() => logDocumentEvent(doc.id, 'open')}>
-              <ExternalLink className="w-4 h-4" aria-hidden="true" /> View
-            </a>
+            {!isWordFile(doc) && (
+              <a className={actionCls} href={urls.view} target="_blank" rel="noopener noreferrer" onClick={() => logDocumentEvent(doc.id, 'open')}>
+                <ExternalLink className="w-4 h-4" aria-hidden="true" /> View
+              </a>
+            )}
             <a className={actionCls} href={urls.download} rel="noopener noreferrer" onClick={() => logDocumentEvent(doc.id, 'download')}>
               <Download className="w-4 h-4" aria-hidden="true" /> Download
             </a>

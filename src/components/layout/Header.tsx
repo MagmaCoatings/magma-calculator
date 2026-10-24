@@ -1,7 +1,8 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
-import { LogOut, Settings, Calculator, FileText, User, FolderOpen } from 'lucide-react'
+import { LogOut, Settings, Calculator, FileText, User, FolderOpen, Images } from 'lucide-react'
+import { useMediaAccess } from '@/hooks/useMediaAccess'
 import { MagmaMark } from '@/components/brand/MagmaMark'
 import { NotificationBell, IncomingNotification } from '@/components/notifications/NotificationBell'
 
@@ -9,6 +10,7 @@ export function Header() {
   const { profile, signOut } = useAuth()
   const location = useLocation()
 
+  const { access: media } = useMediaAccess()
   const isAdmin = profile?.role === 'admin'
   const isActive = (path: string) => location.pathname === path
   const isAdminActive = location.pathname.startsWith('/admin')
@@ -60,6 +62,19 @@ export function Header() {
                   Documents
                 </Button>
               </Link>
+
+              {media.visible && (
+                <Link to="/media">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`gap-2 ${isActive('/media') ? 'bg-molten-tint text-basalt' : ''}`}
+                  >
+                    <Images className={`w-4 h-4 ${isActive('/media') ? 'text-molten' : 'text-ash'}`} />
+                    Media
+                  </Button>
+                </Link>
+              )}
 
               {isAdmin && (
                 <Link to="/admin">
@@ -148,6 +163,17 @@ export function Header() {
               <span className="text-xs mt-1 font-medium">Documents</span>
             </div>
           </Link>
+
+          {media.visible && (
+            <Link to="/media" className="flex-1">
+              <div className={`flex flex-col items-center py-2 ${isActive('/media') ? 'text-basalt' : 'text-ash'}`}>
+                <div className={`p-1 rounded-lg ${isActive('/media') ? 'bg-molten-tint' : ''}`}>
+                  <Images className={`w-6 h-6 ${isActive('/media') ? 'text-molten' : ''}`} />
+                </div>
+                <span className="text-xs mt-1 font-medium">Media</span>
+              </div>
+            </Link>
+          )}
 
           <Link to="/profile" className="flex-1">
             <div className={`flex flex-col items-center py-2 ${isActive('/profile') ? 'text-basalt' : 'text-ash'}`}>
